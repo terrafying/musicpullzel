@@ -1,0 +1,108 @@
+.debug-panel {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  max-width: 600px;
+  background: rgba(0, 0, 0, 0.9);
+  color: #fff;
+  font-family: monospace;
+  z-index: 1000;
+  transition: transform 0.3s ease;
+  transform: translateY(calc(100% - 40px));
+}
+
+.debug-panel.visible {
+  transform: translateY(0);
+}
+
+.debug-toggle {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: #333;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+}
+
+.debug-content {
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.debug-controls {
+  padding: 8px;
+  display: flex;
+  gap: 8px;
+  background: #222;
+}
+
+.debug-controls select,
+.debug-controls button {
+  padding: 4px 8px;
+  background: #444;
+  color: #fff;
+  border: 1px solid #666;
+  border-radius: 4px;
+}
+
+.log-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.log-entry {
+  margin-bottom: 4px;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.log-entry .timestamp {
+  color: #888;
+  margin-right: 8px;
+}
+
+.log-entry .level {
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.log-entry .category {
+  color: #888;
+  margin-right: 8px;
+}
+
+.log-entry .message {
+  color: #fff;
+}
+
+.log-entry .data {
+  margin-top: 4px;
+  padding: 4px;
+  background: #222;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.log-entry.debug {
+  background: rgba(107, 114, 128, 0.1);
+}
+
+.log-entry.info {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.log-entry.warn {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.log-entry.error {
+  background: rgba(239, 68, 68, 0.1);
+} 

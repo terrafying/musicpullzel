@@ -1,0 +1,46 @@
+{
+  "name": "music-puzzle-game",
+  "version": "1.0.0",
+  "description": "Interactive music-based puzzle game with Rust core and web frontend",
+  "private": true,
+  "scripts": {
+    "dev": "npm run build:wasm:watch & npm --prefix puzzle-web run dev",
+    "build": "npm run build:wasm && npm --prefix puzzle-web run build",
+    "build:wasm": "wasm-pack build puzzle-core --target web --out-dir ../puzzle-web/src/wasm",
+    "build:wasm:watch": "wasm-pack build --watch puzzle-core --target web --out-dir ../puzzle-web/src/wasm",
+    "test": "npm run test:rust && npm --prefix puzzle-web run test",
+    "test:rust": "cargo test --manifest-path puzzle-core/Cargo.toml",
+    "lint": "eslint \"puzzle-web/**/*.{ts,tsx}\"",
+    "fmt": "prettier --write \"**/*.{ts,tsx,rs,md}\"",
+    "prepare": "husky",
+    "pre-commit": "lint-staged"
+  },
+  "keywords": ["game", "music", "puzzle", "webassembly", "rust"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "@vitejs/plugin-react": "^4.4.1",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "eslint": "^9.25.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.3",
+    "wasm-pack": "^0.13.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ],
+    "*.rs": [
+      "rustfmt --check"
+    ]
+  }
+}

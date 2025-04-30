@@ -1,0 +1,50 @@
+# Rust build artifacts
+/target/
+**/target/
+/pkg/
+**/pkg/
+
+# Node.js dependencies
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.pnpm-debug.log
+
+# Vite build output
+/dist/
+**/dist/
+
+# WASM build output
+puzzle-web/src/wasm/
+
+# IDE and OS-specific files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+.*.sw?
+*~
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Coverage directory used by testing tools
+coverage/
+
+# Debug files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Lock files (can optionally comment these out if you want to commit them)
+# package-lock.json
+# yarn.lock
+# Cargo.lock
+
+# Generated files
+.husky/_
+

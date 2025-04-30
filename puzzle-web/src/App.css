@@ -1,0 +1,1207 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+.game-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  background-color: #1a1a1a;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.puzzle-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1.5rem;
+  padding: 3rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 2rem;
+  box-shadow: 
+    0 4px 6px rgba(0, 0, 0, 0.1),
+    0 0 40px rgba(0, 0, 0, 0.1) inset;
+  max-width: 800px;
+  width: 100%;
+  aspect-ratio: 4/3;
+  margin-bottom: 2rem;
+}
+
+.note-button {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border: none;
+  font-size: 1rem;
+  font-weight: bold;
+  font-family: 'Fira Code', monospace;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Shape variations */
+.note-button.circle {
+  border-radius: 50%;
+}
+
+.note-button.square {
+  border-radius: 10px;
+}
+
+.note-button.rectangle {
+  width: 100px;
+  height: 60px;
+  border-radius: 10px;
+}
+
+.note-button.spinner {
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+}
+
+.note-button.spinner::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 2s linear infinite;
+}
+
+/* Rhythm indicator */
+.rhythm-indicator {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+  top: 5px;
+  right: 5px;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.note-button.rhythmic.active .rhythm-indicator {
+  animation: pulse-active 0.5s ease-in-out infinite;
+}
+
+/* Animations */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.8); opacity: 0.4; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+  100% { transform: scale(0.8); opacity: 0.4; }
+}
+
+@keyframes pulse-active {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Active state variations */
+.note-button.circle.active {
+  box-shadow: 
+    0 0 20px currentColor,
+    0 0 40px rgba(255, 255, 255, 0.2);
+}
+
+.note-button.square.active {
+  box-shadow: 
+    0 0 20px currentColor,
+    0 0 40px rgba(255, 255, 255, 0.2);
+  transform: rotate(45deg) scale(1.1);
+}
+
+.note-button.rectangle.active {
+  box-shadow: 
+    0 0 20px currentColor,
+    0 0 40px rgba(255, 255, 255, 0.2);
+  transform: scaleX(1.2);
+}
+
+.note-button.spinner.active::before {
+  animation: spin 0.5s linear infinite;
+  border-top-color: rgba(255, 255, 255, 1);
+}
+
+/* Hover state variations */
+.note-button.circle:hover {
+  transform: scale(1.05);
+}
+
+.note-button.square:hover {
+  transform: rotate(15deg) scale(1.05);
+}
+
+.note-button.rectangle:hover {
+  transform: scaleX(1.1);
+}
+
+.note-button.spinner:hover::before {
+  animation: spin 1s linear infinite;
+}
+
+/* Ratio labels for different shapes */
+.note-button.circle .ratio-label {
+  transform: translateY(-24px);
+}
+
+.note-button.square .ratio-label {
+  transform: translateY(-24px) rotate(-45deg);
+}
+
+.note-button.rectangle .ratio-label {
+  transform: translateY(-24px);
+}
+
+.note-button.spinner .ratio-label {
+  transform: translateY(-24px);
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .note-button {
+    width: 60px;
+    height: 60px;
+  }
+
+  .note-button.rectangle {
+    width: 75px;
+    height: 45px;
+  }
+}
+
+@media (max-width: 650px) {
+  .note-button {
+    width: 50px;
+    height: 50px;
+  }
+
+  .note-button.rectangle {
+    width: 62.5px;
+    height: 37.5px;
+  }
+}
+
+.resonator {
+  width: 80%;
+  height: 80%;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.9), transparent);
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.note-button.active .resonator {
+  opacity: 0.4;
+  animation: resonance 2s infinite;
+}
+
+@keyframes resonance {
+  0% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+}
+
+.game-info {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.game-info h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(45deg, #4a90e2, #63f5aa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.interaction-hint {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 300;
+}
+
+.debug-panel {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 1.5rem;
+  border-radius: 1rem;
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 800px;
+  backdrop-filter: blur(10px);
+}
+
+.debug-panel h3 {
+  color: #4a90e2;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.debug-panel p {
+  margin: 0.5rem 0;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.debug-panel button {
+  background: linear-gradient(45deg, #4a90e2, #63f5aa);
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  padding: 0.7rem 1.5rem;
+  margin-top: 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: transform 0.2s ease;
+}
+
+.debug-panel button:hover {
+  transform: translateY(-2px);
+}
+
+.debug-toggle {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 0.7rem 1.5rem;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  font-weight: 500;
+  transition: all 0.2s ease;
+  z-index: 100;
+}
+
+.debug-toggle:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: translateY(-2px);
+}
+
+.key-hint {
+  position: absolute;
+  bottom: 0.3rem;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+@media (max-width: 768px) {
+  .puzzle-board {
+    padding: 1.5rem;
+    gap: 1rem;
+  }
+
+  .note-button {
+    font-size: 0.9rem;
+  }
+
+  .key-hint {
+    font-size: 0.6rem;
+  }
+
+  .game-info h2 {
+    font-size: 1.5rem;
+  }
+
+  .interaction-hint {
+    font-size: 0.9rem;
+  }
+}
+
+.visualizer-container {
+  width: 100%;
+  max-width: 800px;
+  height: 150px;
+  margin: 2rem 0;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 1rem;
+  box-shadow: 
+    0 4px 6px rgba(0, 0, 0, 0.1),
+    0 0 20px rgba(0, 0, 0, 0.1) inset;
+  overflow: hidden;
+}
+
+.audio-visualizer {
+  width: 100%;
+  height: 100%;
+}
+
+.controls {
+  width: 100%;
+  max-width: 800px;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 1rem;
+  margin: 1rem 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.volume-control label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  min-width: 60px;
+}
+
+.volume-control input[type="range"] {
+  -webkit-appearance: none;
+  width: 200px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  outline: none;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #4a90e2;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: #63f5aa;
+}
+
+.volume-control input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #4a90e2;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.volume-control input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  background: #63f5aa;
+}
+
+@media (max-width: 768px) {
+  .visualizer-container {
+    height: 100px;
+    margin: 1rem 0;
+  }
+
+  .volume-control {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .volume-control input[type="range"] {
+    width: 150px;
+  }
+}
+
+.game-controls {
+  width: 100%;
+  max-width: 800px;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.difficulty-controls {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.difficulty-button {
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.difficulty-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.difficulty-button.active {
+  background: linear-gradient(45deg, #4a90e2, #63f5aa);
+  color: white;
+  box-shadow: 0 0 20px rgba(74, 144, 226, 0.3);
+}
+
+.new-puzzle-button {
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: linear-gradient(45deg, #4a90e2, #63f5aa);
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-self: center;
+}
+
+.new-puzzle-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(74, 144, 226, 0.3);
+}
+
+.game-stats {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 800px;
+}
+
+.stats-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stats-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stats-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #4a90e2;
+  text-shadow: 0 0 10px rgba(74, 144, 226, 0.3);
+}
+
+.note-button.target {
+  box-shadow: 
+    0 0 20px var(--note-color),
+    0 0 40px rgba(255, 255, 255, 0.2),
+    0 0 0 2px var(--note-color);
+  animation: target-pulse 2s infinite;
+}
+
+@keyframes target-pulse {
+  0% {
+    box-shadow: 
+      0 0 20px var(--note-color),
+      0 0 40px rgba(255, 255, 255, 0.2),
+      0 0 0 2px var(--note-color);
+  }
+  50% {
+    box-shadow: 
+      0 0 30px var(--note-color),
+      0 0 60px rgba(255, 255, 255, 0.3),
+      0 0 0 4px var(--note-color);
+  }
+  100% {
+    box-shadow: 
+      0 0 20px var(--note-color),
+      0 0 40px rgba(255, 255, 255, 0.2),
+      0 0 0 2px var(--note-color);
+  }
+}
+
+.success-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  padding: 2rem;
+  border-radius: 1rem;
+  text-align: center;
+  animation: success-fade 3s forwards;
+  z-index: 1000;
+}
+
+.success-overlay h2 {
+  font-size: 2rem;
+  color: #4a90e2;
+  margin-bottom: 1rem;
+}
+
+.success-overlay p {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+@keyframes success-fade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -40%);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  90% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -60%);
+  }
+}
+
+@media (max-width: 768px) {
+  .game-controls {
+    padding: 0 1rem;
+  }
+
+  .difficulty-controls {
+    gap: 0.5rem;
+  }
+
+  .difficulty-button {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .game-stats {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .stats-item {
+    flex-direction: row;
+    gap: 1rem;
+  }
+
+  .stats-label {
+    font-size: 0.8rem;
+  }
+
+  .stats-value {
+    font-size: 1.2rem;
+  }
+}
+
+.app-container {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  background: #1a1a2e;
+  color: white;
+}
+
+.title {
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  color: #e6e6fa;
+  text-shadow: 0 0 10px rgba(230, 230, 250, 0.5);
+}
+
+.notes-container {
+  position: relative;
+  width: 800px;
+  height: 800px;
+  margin: 2rem auto;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 15px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Create a circular layout */
+.note-grid {
+  position: relative;
+  width: 700px;
+  height: 700px;
+  display: grid;
+  place-items: center;
+}
+
+/* Position notes in a circle using CSS custom properties */
+.note-button:nth-child(1) { /* 1/1 */
+  transform: translate(350px, 0px);
+}
+.note-button:nth-child(2) { /* 16/15 */
+  transform: translate(247.5px, -247.5px);
+}
+.note-button:nth-child(3) { /* 9/8 */
+  transform: translate(0px, -350px);
+}
+.note-button:nth-child(4) { /* 6/5 */
+  transform: translate(-247.5px, -247.5px);
+}
+.note-button:nth-child(5) { /* 5/4 */
+  transform: translate(-350px, 0px);
+}
+.note-button:nth-child(6) { /* 4/3 */
+  transform: translate(-247.5px, 247.5px);
+}
+.note-button:nth-child(7) { /* 3/2 */
+  transform: translate(0px, 350px);
+}
+.note-button:nth-child(8) { /* 8/5 */
+  transform: translate(247.5px, 247.5px);
+}
+.note-button:nth-child(9) { /* 5/3 */
+  transform: translate(175px, -87.5px);
+}
+.note-button:nth-child(10) { /* 16/9 */
+  transform: translate(-175px, -87.5px);
+}
+.note-button:nth-child(11) { /* 15/8 */
+  transform: translate(-175px, 87.5px);
+}
+.note-button:nth-child(12) { /* 2/1 */
+  transform: translate(175px, 87.5px);
+}
+
+.note-button.active {
+  transform: scale(1.1) translate(var(--x), var(--y));
+  box-shadow: 
+    0 0 20px currentColor,
+    0 0 40px rgba(255, 255, 255, 0.2);
+  z-index: 3;
+}
+
+.note-button:hover {
+  transform: scale(1.05) translate(var(--x), var(--y));
+  box-shadow: 
+    0 0 15px currentColor,
+    0 0 30px rgba(255, 255, 255, 0.15);
+}
+
+.note-button.active:hover {
+  transform: scale(1.15) translate(var(--x), var(--y));
+}
+
+/* Resonance lines canvas */
+.connection-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Add ratio labels */
+.ratio-label {
+  position: absolute;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  font-family: 'Fira Code', monospace;
+  text-align: center;
+  width: 100%;
+  top: -20px;
+}
+
+/* Enhance debug panel */
+.debug-panel {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 1.5rem;
+  border-radius: 10px;
+  font-family: 'Fira Code', monospace;
+  color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.debug-panel h3 {
+  margin: 0 0 1rem 0;
+  color: #4a90e2;
+  font-size: 1.1rem;
+}
+
+.debug-panel p {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.debug-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Fira Code', monospace;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  z-index: 99;
+}
+
+.debug-toggle:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: translateY(-2px);
+}
+
+/* Volume control styling */
+.volume-control {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  backdrop-filter: blur(10px);
+  z-index: 99;
+}
+
+.volume-control label {
+  color: white;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.9rem;
+}
+
+.volume-control input[type="range"] {
+  -webkit-appearance: none;
+  width: 150px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  outline: none;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #4a90e2;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: #63f5aa;
+}
+
+/* Add resonance meter */
+.resonance-meter {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.resonance-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4a90e2, #63f5aa);
+  transition: width 0.3s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .notes-container {
+    width: 600px;
+    height: 600px;
+  }
+
+  .note-grid {
+    width: 500px;
+    height: 500px;
+  }
+
+  .note-button {
+    width: 60px;
+    height: 60px;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 650px) {
+  .notes-container {
+    width: 400px;
+    height: 400px;
+  }
+
+  .note-grid {
+    width: 350px;
+    height: 350px;
+  }
+
+  .note-button {
+    width: 50px;
+    height: 50px;
+    font-size: 0.7rem;
+  }
+}
+
+.game-board {
+  position: relative;
+  width: 800px;
+  height: 800px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.echo-container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.note-echo {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: blur(4px);
+}
+
+.note-button {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border: none;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.3s ease-out;
+}
+
+.note-button:hover {
+  transform: translate(-50%, -50%) scale(1.1) !important;
+}
+
+.note-button.active {
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.resonator {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+.resonator.active {
+  opacity: 1;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Sacred geometry shape styles */
+.note-button.circle {
+  border-radius: 50%;
+}
+
+.note-button.square {
+  border-radius: 5px;
+}
+
+.note-button.rectangle {
+  width: 60px;
+  height: 40px;
+  border-radius: 5px;
+}
+
+.note-button.spinner {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+/* Sacred geometry patterns */
+.sacred-pattern {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+/* Delay trail effect */
+.delay-trail {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  animation: fadeTrail 0.75s ease-out forwards;
+}
+
+@keyframes fadeTrail {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+/* Enhanced visual feedback */
+.ratio-label {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.key-hint {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.spatial-controls {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  z-index: 100;
+}
+
+.spatial-toggle {
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Fira Code', monospace;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.spatial-toggle:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: translateY(-2px);
+}
+
+.spatial-toggle.active {
+  background: linear-gradient(45deg, #4a90e2, #63f5aa);
+  border-color: transparent;
+}
+
+.spatial-hints {
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1rem;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  display: flex;
+  gap: 2rem;
+}
+
+.hint-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.hint-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'Fira Code', monospace;
+  font-size: 0.9rem;
+}
+
+.hint-row span:first-child {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+/* Add visual feedback for spatial movement */
+.spatial-feedback {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px;
+  height: 200px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.spatial-feedback.visible {
+  opacity: 0.1;
+}
+
+.spatial-feedback::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 4px;
+  background: white;
+  border-radius: 50%;
+}
+
+.spatial-feedback::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.2;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0.5;
+  }
+}

@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  rust:
+    name: Rust Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+          
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        
+      - name: Run cargo tests
+        run: cargo test --manifest-path puzzle-core/Cargo.toml
+        
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        
+      - name: Build WASM module
+        run: wasm-pack build puzzle-core --target web --out-dir ../puzzle-web/src/wasm
+
+  web:
+    name: Web Tests and Build
+    runs-on: ubuntu-latest
+    needs: rust
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install root dependencies
+        run: npm ci
+        
+      - name: Install web dependencies
+        run: cd puzzle-web && npm ci
+        
+      - name: Type checking
+        run: cd puzzle-web && npm run typecheck
+        
+      - name: Lint
+        run: npm run lint
+        
+      - name: Run web tests
+        run: cd puzzle-web && npm test
+        
+      - name: Build web app
+        run: cd puzzle-web && npm run build
+        
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: puzzle-web/dist/
+
