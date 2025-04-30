@@ -15,7 +15,13 @@
     "prepare": "husky",
     "pre-commit": "lint-staged"
   },
-  "keywords": ["game", "music", "puzzle", "webassembly", "rust"],
+  "keywords": [
+    "game",
+    "music",
+    "puzzle",
+    "webassembly",
+    "rust"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
@@ -42,5 +48,8 @@
     "*.rs": [
       "rustfmt --check"
     ]
+  },
+  "dependencies": {
+    "face-api.js": "^0.22.2"
   }
 }
