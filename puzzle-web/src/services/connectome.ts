@@ -1,4 +1,4 @@
-import { Vector3, EmergentPattern as EmergentPatternType } from './types';
+import { Vector3, EmergentPattern as EmergentPatternType, Transformation } from './types';
 
 interface ConnectomeNode {
   id: number;
@@ -21,12 +21,6 @@ interface ConnectomeNode {
 
 type EmergentPattern = EmergentPatternType;
 
-interface Transformation {
-  type: 'harmonic' | 'rhythmic' | 'spatial' | 'imaginary';
-  strength: number;
-  timestamp: number;
-}
-
 type ResonanceType = 'harmonic' | 'rhythmic' | 'spatial' | 'imaginary';
 
 export interface AnalogicalMapping {
@@ -34,7 +28,7 @@ export interface AnalogicalMapping {
   target: number[];
   similarity: number;
   transformation: {
-    type: 'harmonic' | 'rhythmic' | 'spatial' | 'imaginary';
+    type: ResonanceType;
     strength: number;
   };
 }
@@ -164,11 +158,11 @@ export class ConnectomeService {
     
     // Update existing patterns
     this.patterns = this.patterns.filter(pattern => {
-      if (pattern.death !== null) return false;
+      if (pattern.evolution.death !== null) return false;
       
       const isStillActive = this.validatePattern(pattern, activeNotes);
       if (!isStillActive) {
-        pattern.death = Date.now();
+        pattern.evolution.death = Date.now();
         return true;
       }
       
@@ -240,15 +234,15 @@ export class ConnectomeService {
     const now = Date.now();
     return {
       id: `pattern_${now}_${Math.random().toString(36).substr(2, 9)}`,
-      nodes,
+      nodes: nodes.map(String),
       patternType: this.determinePatternType(nodes),
       strength: this.calculatePatternStrength(nodes),
       stability: 1,
       rotation: 0,
       evolution: {
         birth: now,
-        death: null,
-        transformations: []
+        death: undefined,
+        transitions: []
       },
       resonanceField: {
         center: this.calculatePatternCenter(nodes),
@@ -259,7 +253,7 @@ export class ConnectomeService {
   }
 
   private calculatePatternCenter(nodes: number[]): Vector3 {
-    const positions = nodes.map(id => this.nodes.get(id)?.position).filter(Boolean) as Vector3[];
+    const positions = nodes.map(id => this.nodes.get(Number(id))?.position).filter(Boolean) as Vector3[];
     return {
       x: positions.reduce((sum, pos) => sum + pos.x, 0) / positions.length,
       y: positions.reduce((sum, pos) => sum + pos.y, 0) / positions.length,
@@ -269,21 +263,21 @@ export class ConnectomeService {
 
   private calculatePatternStrength(nodes: number[]): number {
     return nodes.reduce((sum, id) => {
-      const node = this.nodes.get(id);
+      const node = this.nodes.get(Number(id));
       return sum + (node?.resonance || 0);
     }, 0) / nodes.length;
   }
 
   private determinePatternType(nodes: number[]): EmergentPattern['patternType'] {
     const imaginaryCount = nodes.filter(id => {
-      const node = this.nodes.get(id);
+      const node = this.nodes.get(Number(id));
       return node?.connections.some(c => c.type === 'imaginary');
     }).length;
     
     if (imaginaryCount > nodes.length / 2) return 'imaginary';
     
     const harmonicCount = nodes.filter(id => {
-      const node = this.nodes.get(id);
+      const node = this.nodes.get(Number(id));
       return node?.connections.some(c => c.type === 'harmonic');
     }).length;
     
@@ -295,13 +289,13 @@ export class ConnectomeService {
   private calculatePatternRadius(nodes: number[]): number {
     const center = this.calculatePatternCenter(nodes);
     return Math.max(...nodes.map(id => {
-      const node = this.nodes.get(id);
+      const node = this.nodes.get(Number(id));
       return node ? this.calculateDistance(center, node.position) : 0;
     }));
   }
 
   private validatePattern(pattern: EmergentPattern, activeNotes: number[]): boolean {
-    return pattern.nodes.every(nodeId => activeNotes.includes(nodeId));
+    return pattern.nodes.every(nodeId => activeNotes.includes(Number(nodeId)));
   }
 
   private evolvePattern(pattern: EmergentPattern, activeNotes: number[]): void {
@@ -310,7 +304,7 @@ export class ConnectomeService {
     
     // Add transformation based on pattern evolution
     if (Math.random() < 0.1) {
-      pattern.evolution.transformations.push({
+      pattern.evolution.transitions.push({
         type: pattern.patternType,
         strength: pattern.strength,
         timestamp: now
@@ -318,7 +312,7 @@ export class ConnectomeService {
     }
     
     // Update pattern properties
-    pattern.strength = this.calculatePatternStrength(pattern.nodes);
+    pattern.strength = this.calculatePatternStrength(pattern.nodes.map(Number));
     pattern.stability = Math.max(0, pattern.stability - age * 0.001);
     
     // Update resonance field
@@ -327,7 +321,7 @@ export class ConnectomeService {
 
   private updateImaginaryField(activeNotes: number[]): void {
     const imaginaryNodes = activeNotes.filter(id => {
-      const node = this.nodes.get(id);
+      const node = this.nodes.get(Number(id));
       return node?.connections.some(c => c.type === 'imaginary');
     });
     
@@ -344,7 +338,7 @@ export class ConnectomeService {
   }
 
   public getActivePatterns(): EmergentPattern[] {
-    return this.patterns.filter(p => p.death === null);
+    return this.patterns.filter(p => !p.evolution.death);
   }
 
   public getImaginaryField(): typeof this.imaginaryField {
@@ -407,21 +401,21 @@ export class ConnectomeService {
 
   private calculateGroupStructure(group: number[]): number[] {
     return group.map(id => {
-      const node = this.nodes.get(id);
+      const node = this.nodes.get(Number(id));
       return node ? node.connections.length : 0;
     });
   }
 
   private calculateGroupResonance(group: number[]): number[] {
     return group.map(id => {
-      const node = this.nodes.get(id);
+      const node = this.nodes.get(Number(id));
       return node ? node.resonance : 0;
     });
   }
 
   private calculateGroupSpatial(group: number[]): Vector3[] {
     return group.map(id => {
-      const node = this.nodes.get(id);
+      const node = this.nodes.get(Number(id));
       return node ? node.position : { x: 0, y: 0, z: 0 };
     });
   }
@@ -486,8 +480,8 @@ export class ConnectomeService {
 
   private enhancePatternWithAnalogies(pattern: EmergentPattern): EmergentPattern {
     const relevantMappings = this.analogicalMappings.filter(mapping =>
-      mapping.source.some(id => pattern.nodes.includes(id)) ||
-      mapping.target.some(id => pattern.nodes.includes(id))
+      mapping.source.some(id => pattern.nodes.includes(String(id))) ||
+      mapping.target.some(id => pattern.nodes.includes(String(id)))
     );
     
     if (relevantMappings.length === 0) return pattern;
