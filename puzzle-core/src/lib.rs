@@ -1,9 +1,8 @@
 use wasm_bindgen::prelude::*;
 use rand::prelude::*;
-use rand_distr::{Normal, Distribution};
 use serde::{Serialize, Deserialize};
 use rand_chacha::ChaCha8Rng;
-use rand::SeedableRng; // Ensure this is also imported for `from_entropy`
+use rand::SeedableRng;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.

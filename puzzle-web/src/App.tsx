@@ -11,6 +11,17 @@ import PatternVisualizer from './components/PatternVisualizer'
 import AnalogicalVisualizer from './components/AnalogicalVisualizer'
 import PatternExplorer from './components/PatternExplorer'
 import { SharedStateService } from './services/sharedState'
+import { WasmService } from './services/wasm'
+import { Difficulty } from 'puzzle-core'
+import { PatternSynthService } from './services/patternSynth'
+import { PatternDialogueService } from './services/patternDialogue'
+import { InteractiveCanvas } from './components/InteractiveCanvas'
+import { MonsterService } from './services/monsterService'
+import { MonsterRenderer } from './components/MonsterRenderer'
+import { ProgressVisualizer } from './components/ProgressVisualizer'
+import { EmotionService } from './services/emotionService'
+import { EmotionFeedback } from './components/EmotionFeedback'
+import { RustEmotionService } from './services/rustEmotionService'
 import './App.css'
 
 // Type definitions
@@ -131,6 +142,26 @@ function App() {
     opacity: number;
   }>>(new Map());
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [wasmService] = useState(() => new WasmService());
+  const [gameStarted, setGameStarted] = useState(false);
+  const [patternSynth] = useState(() => new PatternSynthService(audioService));
+  const [feedbackLevel, setFeedbackLevel] = useState(0.3);
+  const [patternMixLevel, setPatternMixLevel] = useState(0.5);
+  const [patternDialogue] = useState(() => new PatternDialogueService(patternSynth));
+  const [dialogueMode, setDialogueMode] = useState<'user' | 'system' | 'balanced'>('balanced');
+  const [patterns, setPatterns] = useState<ResonancePattern[]>([]);
+  const [monsterService] = useState(() => new MonsterService());
+  const [monsters, setMonsters] = useState<Monster[]>([]);
+  const [selectedMonster, setSelectedMonster] = useState<number | null>(null);
+  const [totalPatterns] = useState(100); // Total patterns to defeat
+  const [defeatedPatterns, setDefeatedPatterns] = useState(0);
+  const [learningEfficiency, setLearningEfficiency] = useState(0);
+  const [emotionService] = useState(() => new RustEmotionService('http://localhost:8000/analyze'));
+  const [emotionalState, setEmotionalState] = useState({
+    emotion: 'neutral',
+    stability: 0,
+    engagement: 0
+  });
 
   useEffect(() => {
     const initializeAudio = async () => {
@@ -161,6 +192,7 @@ function App() {
       types: pattern.resonanceTypes
     });
     setPathways(pattern.pathways);
+    setPatterns(prevPatterns => [...prevPatterns, pattern]);
   };
 
   // Calculate resonating pairs based on active notes
@@ -256,81 +288,88 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const toggleNote = (noteIndex: number) => {
-    const pattern = puzzleService.toggleNote(noteIndex);
-    setActiveNotes(pattern.activeNotes);
-    setResonatingPairs(pattern.resonatingPairs);
-    setSemanticState({
-      harmonic: pattern.harmonicState,
-      rhythmic: pattern.rhythmicState,
-      types: pattern.resonanceTypes
-    });
-    setPathways(pattern.pathways);
+  const startGame = async (difficulty: Difficulty) => {
+    await wasmService.createGame(difficulty);
+    setGameStarted(true);
+  };
+
+  const toggleNote = async (note: number) => {
+    const newActiveNotes = activeNotes.includes(note)
+      ? activeNotes.filter(n => n !== note)
+      : [...activeNotes, note];
     
-    // Update connectome resonance
-    connectomeService.updateResonance(pattern.activeNotes);
+    setActiveNotes(newActiveNotes);
     
-    const frequency = ratioToFrequency(noteVisuals[noteIndex].ratio);
-    const { waveform, isRhythmic } = noteVisuals[noteIndex];
-    
-    // Enhanced audio parameters with spinor motion effects
-    const spinorRate = pattern.resonatingPairs.length * 0.5;
-    const spinorPhase = pattern.activeNotes.length * Math.PI / 6;
-    
-    // Update spinor state for the toggled note
-    setSpinorStates(prevStates => {
-      const newStates = new Map(prevStates);
-      if (pattern.activeNotes.includes(noteIndex)) {
-        newStates.set(noteIndex, {
-          rate: spinorRate,
-          phase: spinorPhase,
-          startTime: Date.now()
-        });
-      } else {
-        newStates.delete(noteIndex);
+    if (newActiveNotes.length > 0) {
+      const guess = parseInt(newActiveNotes.join(''), 2);
+      const correct = await wasmService.makeGuess(guess);
+      
+      if (correct) {
+        // Update connectome resonance based on the correct pattern
+        connectomeService.updateResonance(newActiveNotes);
       }
-      return newStates;
-    });
-    
-    const audioParams = {
-      waveform,
-      isRhythmic,
-      modulation: (pattern.harmonicState === 'tension' ? 'frequency' : 
-                  pattern.harmonicState === 'resolution' ? 'amplitude' : 
-                  pattern.harmonicState === 'transition' ? 'ring' : 'phase') as 'frequency' | 'amplitude' | 'ring' | 'phase',
-      modDepth: pattern.strength * 15 + 5,
-      modRate: pattern.rhythmicState === 'chaos' ? 8 : 
-              pattern.rhythmicState === 'pulse' ? 2 :
-              pattern.rhythmicState === 'flow' ? 4 : 6,
-      spinorRate,
-      spinorPhase,
-      gateTime: pattern.rhythmicState === 'pulse' ? 0.2 :
-                pattern.rhythmicState === 'flow' ? 0.4 :
-                pattern.rhythmicState === 'counterpoint' ? 0.6 : 0.8,
-      releaseTime: pattern.harmonicState === 'resolution' ? 0.5 :
-                  pattern.harmonicState === 'tension' ? 0.1 :
-                  pattern.harmonicState === 'transition' ? 0.3 : 0.2
-    };
-    
-    // Play note with enhanced parameters
-    audioService.playNote(
-      frequency,
-      audioParams.waveform,
-      audioParams.isRhythmic,
-      audioParams.modulation,
-      audioParams.modDepth,
-      audioParams.modRate,
-      audioParams.spinorRate,
-      audioParams.spinorPhase,
-      audioParams.gateTime,
-      audioParams.releaseTime
-    );
+    }
+  };
+
+  const getPattern = () => {
+    return wasmService.getPattern();
+  };
+
+  const getStats = () => {
+    return wasmService.getStats();
   };
 
   const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(event.target.value);
     setVolume(newVolume);
     audioService.setVolume(newVolume);
+  };
+
+  // Update pattern synthesis when patterns change
+  useEffect(() => {
+    const activePatterns = connectomeService.getActivePatterns();
+    activePatterns.forEach((pattern, index) => {
+      if (pattern.strength > 0) {
+        patternSynth.updatePatternSynth(index, pattern);
+      } else {
+        patternSynth.cleanupPatternSynth(index);
+      }
+    });
+  }, [connectomeService.getActivePatterns()]);
+
+  // Handle feedback level changes
+  const handleFeedbackChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const level = parseFloat(event.target.value);
+    setFeedbackLevel(level);
+    patternSynth.setFeedbackLevel(level);
+  };
+
+  // Handle pattern mix level changes
+  const handlePatternMixChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const level = parseFloat(event.target.value);
+    setPatternMixLevel(level);
+    patternSynth.setPatternMixLevel(level);
+  };
+
+  // Update pattern dialogue when patterns change
+  useEffect(() => {
+    const activePatterns = connectomeService.getActivePatterns();
+    activePatterns.forEach((pattern, index) => {
+      if (pattern.strength > 0) {
+        if (!patternDialogue.hasDialogue(index)) {
+          patternDialogue.initializeDialogue(index, pattern);
+        }
+        patternDialogue.handleUserInteraction(index, pattern);
+      } else {
+        patternDialogue.cleanupDialogue(index);
+      }
+    });
+  }, [connectomeService.getActivePatterns()]);
+
+  // Handle dialogue mode changes
+  const handleDialogueModeChange = (mode: 'user' | 'system' | 'balanced') => {
+    setDialogueMode(mode);
+    patternDialogue.setDialogueMode(mode);
   };
 
   const { pairs: calculatedPairs } = calculateResonatingPairs();
@@ -358,103 +397,357 @@ function App() {
   // Get semantic state colors
   const stateColors = getSemanticStateColors();
 
-  return (
-    <div className="app">
-      <div className="semantic-state-display">
-        <div className="state-indicator harmonic" style={{ backgroundColor: stateColors.harmonic }}>
-          {semanticState.harmonic}
-        </div>
-        <div className="state-indicator rhythmic" style={{ backgroundColor: stateColors.rhythmic }}>
-          {semanticState.rhythmic}
-        </div>
-      </div>
+  const handleConnectionDrawn = (from: number, to: number, strength: number) => {
+    // Update pattern connections
+    const updatedPatterns = [...patterns];
+    const fromPattern = updatedPatterns[from];
+    const toPattern = updatedPatterns[to];
 
-      <div className="game-board">
-        <PatternExplorer
-          connectomeService={connectomeService}
+    if (fromPattern && toPattern) {
+      // Add connection if it doesn't exist
+      const existingConnection = fromPattern.connections.find(
+        conn => conn.to === to
+      );
+
+      if (!existingConnection) {
+        fromPattern.connections.push({
+          from,
+          to,
+          strength
+        });
+      } else {
+        // Update existing connection strength
+        existingConnection.strength = strength;
+      }
+
+      setPatterns(updatedPatterns);
+    }
+  };
+
+  const handleShapeMoved = (index: number, x: number, y: number) => {
+    const updatedPatterns = [...patterns];
+    const pattern = updatedPatterns[index];
+
+    if (pattern) {
+      pattern.position = { x, y };
+      setPatterns(updatedPatterns);
+    }
+  };
+
+  // Update monsters
+  useEffect(() => {
+    const updateMonsters = () => {
+      monsterService.updateMonsterPositions(patterns);
+      setMonsters(monsterService.getMonsters());
+    };
+
+    const interval = setInterval(updateMonsters, 1000 / 60); // 60 FPS
+    return () => clearInterval(interval);
+  }, [patterns]);
+
+  // Handle pattern attacks on monsters with learning
+  const handlePatternAttack = (pattern: EmergentPattern) => {
+    monsters.forEach(monster => {
+      const distance = Math.hypot(
+        pattern.position.x - monster.position.x,
+        pattern.position.y - monster.position.y
+      );
+
+      if (distance < 100) { // Attack range
+        const defeated = monsterService.attackMonster(monster.id, pattern);
+        if (defeated) {
+          // Play defeat sound
+          audioService.playNote(440 + monster.id * 100, 0.5, 'sine');
+          
+          // Record successful attack for learning
+          monsterService.recordPlayerResponse(pattern.type, true, pattern.strength * 20);
+        } else {
+          // Record unsuccessful attack for learning
+          monsterService.recordPlayerResponse(pattern.type, false, pattern.strength * 10);
+        }
+      }
+    });
+  };
+
+  // Update pattern synthesis to include monster interactions and learning
+  useEffect(() => {
+    const activePatterns = connectomeService.getActivePatterns();
+    activePatterns.forEach((pattern, index) => {
+      if (pattern.strength > 0) {
+        patternSynth.updatePatternSynth(index, pattern);
+        handlePatternAttack(pattern);
+      } else {
+        patternSynth.cleanupPatternSynth(index);
+      }
+    });
+  }, [connectomeService.getActivePatterns()]);
+
+  // Update learning efficiency based on monster scores
+  useEffect(() => {
+    const efficiency = monsters.reduce((sum, monster) => {
+      const score = monsterService.getMonsterScore(monster.id);
+      return sum + (score?.learningEfficiency || 0);
+    }, 0) / Math.max(1, monsters.length);
+
+    setLearningEfficiency(efficiency);
+  }, [monsters]);
+
+  // Update defeated patterns count
+  useEffect(() => {
+    const defeated = monsters.reduce((sum, monster) => {
+      const score = monsterService.getMonsterScore(monster.id);
+      return sum + (score?.patternsDefeated || 0);
+    }, 0);
+
+    setDefeatedPatterns(defeated);
+  }, [monsters]);
+
+  useEffect(() => {
+    const videoElement = document.createElement('video');
+    videoElement.setAttribute('playsinline', '');
+    videoElement.setAttribute('autoplay', '');
+    
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        videoElement.srcObject = stream;
+        emotionService.startDetection(videoElement, (state) => {
+          setEmotionalState({
+            emotion: state.dominant_emotion,
+            stability: 1 - state.intensity,
+            engagement: state.confidence
+          });
+        });
+      })
+      .catch(error => {
+        console.error('Error accessing webcam:', error);
+      });
+
+    return () => {
+      emotionService.stopDetection();
+      const stream = videoElement.srcObject as MediaStream;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [emotionService]);
+
+  // Update monster behavior based on emotional state
+  useEffect(() => {
+    if (!monsterService) return;
+
+    const { emotion, stability, engagement } = emotionalState;
+    
+    // Adjust monster behavior based on emotional state
+    monsters.forEach(monster => {
+      // Increase monster aggression when player is fearful
+      if (emotion === 'fearful') {
+        monster.attackRange *= 1.2;
+      }
+      
+      // Increase monster speed when player is surprised
+      if (emotion === 'surprised') {
+        monster.speed *= 1.3;
+      }
+      
+      // Decrease monster health when player is angry
+      if (emotion === 'angry') {
+        monster.health *= 0.9;
+      }
+      
+      // Increase pattern effectiveness when player is happy
+      if (emotion === 'happy') {
+        monster.learningRate *= 1.2;
+      }
+    });
+  }, [emotionalState, monsters, monsterService]);
+
+  return (
+    <div className="app-container">
+      <h1 className="title">Music Puzzle Game</h1>
+      
+      <div className="game-board" style={{ width: canvasSize.width, height: canvasSize.height }}>
+        <ProgressVisualizer
+          monsters={monsters}
+          totalPatterns={totalPatterns}
+          defeatedPatterns={defeatedPatterns}
+          learningEfficiency={learningEfficiency}
           canvasSize={canvasSize}
-          sharedStateService={sharedStateService}
         />
         
-        <PatternVisualizer
-          patterns={connectomeService.getActivePatterns()}
+        <MonsterRenderer
+          monsters={monsters}
           canvasSize={canvasSize}
-          imaginaryField={connectomeService.getImaginaryField()}
+          onMonsterClick={(monsterId) => setSelectedMonster(monsterId)}
         />
         
-        <AnalogicalVisualizer
-          patterns={connectomeService.getActivePatterns()}
-          mappings={connectomeService.getAnalogicalMappings()}
+        <InteractiveCanvas
+          patterns={patterns}
           canvasSize={canvasSize}
-          imaginaryField={connectomeService.getImaginaryField()}
-          patternHistory={connectomeService.getPatternHistory()}
+          onConnectionDrawn={handleConnectionDrawn}
+          onShapeMoved={handleShapeMoved}
         />
         
-        <ConnectionLines 
-          activeNotes={activeNotes}
-          resonatingPairs={resonatingPairs}
-          pathways={pathways}
-          noteVisuals={noteVisuals}
-          connectomeService={connectomeService}
-        />
-        
-        {/* Render delay echoes */}
-        {Array.from(delayEchoes.entries()).map(([noteIndex, echo]) => (
-          <div key={`echo-${noteIndex}`} className="echo-container">
-            {echo.positions.map((pos, i) => {
-              const note = noteVisuals[noteIndex];
+        {!gameStarted ? (
+          <div className="difficulty-selector">
+            <h2>Select Difficulty</h2>
+            <button onClick={() => startGame(Difficulty.Easy)}>Easy</button>
+            <button onClick={() => startGame(Difficulty.Medium)}>Medium</button>
+            <button onClick={() => startGame(Difficulty.Hard)}>Hard</button>
+          </div>
+        ) : (
+          <>
+            <PatternExplorer
+              connectomeService={connectomeService}
+              canvasSize={canvasSize}
+              sharedStateService={sharedStateService}
+            />
+            
+            <PatternVisualizer
+              patterns={connectomeService.getActivePatterns()}
+              canvasSize={canvasSize}
+              imaginaryField={connectomeService.getImaginaryField()}
+            />
+            
+            <AnalogicalVisualizer
+              patterns={connectomeService.getActivePatterns()}
+              mappings={connectomeService.getAnalogicalMappings()}
+              canvasSize={canvasSize}
+              imaginaryField={connectomeService.getImaginaryField()}
+              patternHistory={connectomeService.getPatternHistory()}
+            />
+            
+            <ConnectionLines 
+              activeNotes={activeNotes}
+              resonatingPairs={resonatingPairs}
+              pathways={pathways}
+              noteVisuals={noteVisuals}
+              connectomeService={connectomeService}
+            />
+            
+            {/* Render delay echoes */}
+            {Array.from(delayEchoes.entries()).map(([noteIndex, echo]) => (
+              <div key={`echo-${noteIndex}`} className="echo-container">
+                {echo.positions.map((pos, i) => {
+                  const note = noteVisuals[noteIndex];
+                  return (
+                    <div
+                      key={`echo-${noteIndex}-${i}`}
+                      className={`note-echo ${note.shape}`}
+                      style={{
+                        position: 'absolute',
+                        left: `${pos.x}px`,
+                        top: `${pos.y}px`,
+                        backgroundColor: note.color,
+                        opacity: echo.opacity * (1 - i / echo.positions.length),
+                        transform: `translate(-50%, -50%) scale(${0.8 - i * 0.1})`,
+                        transition: 'all 0.3s ease-out'
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+
+            {/* Existing note buttons with sacred geometry patterns */}
+            {noteVisuals.map((note, index) => {
+              const spinorState = spinorStates.get(index);
+              const isActive = activeNotes.includes(index);
+              const pattern = Object.values(SACRED_PATTERNS)[index % Object.keys(SACRED_PATTERNS).length];
+              
               return (
-                <div
-                  key={`echo-${noteIndex}-${i}`}
-                  className={`note-echo ${note.shape}`}
+                <button
+                  key={note.name}
+                  data-note-index={index}
+                  className={`note-button ${note.shape} ${isActive ? 'active' : ''}`}
                   style={{
                     position: 'absolute',
-                    left: `${pos.x}px`,
-                    top: `${pos.y}px`,
+                    left: `${note.x}px`,
+                    top: `${note.y}px`,
                     backgroundColor: note.color,
-                    opacity: echo.opacity * (1 - i / echo.positions.length),
-                    transform: `translate(-50%, -50%) scale(${0.8 - i * 0.1})`,
-                    transition: 'all 0.3s ease-out'
+                    transform: `translate(-50%, -50%) rotate(${pattern.rotation}rad)`,
+                    transition: isActive ? 'none' : 'transform 0.3s ease-out'
                   }}
-                />
+                  onClick={() => toggleNote(index)}
+                >
+                  <div 
+                    className={`resonator ${isActive ? 'active' : ''}`}
+                    style={{
+                      animation: isActive ? `pulse ${60 / tempo}s infinite` : 'none',
+                      clipPath: generateSacredGeometryPath(pattern)
+                    }}
+                  />
+                  <span className="ratio-label">{note.name}</span>
+                  <span className="key-hint">{index + 1}</span>
+                </button>
               );
             })}
-          </div>
-        ))}
+          </>
+        )}
 
-        {/* Existing note buttons with sacred geometry patterns */}
-        {noteVisuals.map((note, index) => {
-          const spinorState = spinorStates.get(index);
-          const isActive = activeNotes.includes(index);
-          const pattern = Object.values(SACRED_PATTERNS)[index % Object.keys(SACRED_PATTERNS).length];
-          
-          return (
-            <button
-              key={note.name}
-              data-note-index={index}
-              className={`note-button ${note.shape} ${isActive ? 'active' : ''}`}
-              style={{
-                position: 'absolute',
-                left: `${note.x}px`,
-                top: `${note.y}px`,
-                backgroundColor: note.color,
-                transform: `translate(-50%, -50%) rotate(${pattern.rotation}rad)`,
-                transition: isActive ? 'none' : 'transform 0.3s ease-out'
-              }}
-              onClick={() => toggleNote(index)}
+        {selectedMonster !== null && (
+          <div className="monster-info">
+            <h3>Monster Details</h3>
+            {(() => {
+              const monster = monsters.find(m => m.id === selectedMonster);
+              const score = monsterService.getMonsterScore(selectedMonster);
+              const history = monsterService.getMonsterHistory(selectedMonster);
+              
+              if (!monster || !score) return null;
+              
+              return (
+                <>
+                  <div className="monster-stats">
+                    <div className="stat">
+                      <label>Type:</label>
+                      <span>{monster.type}</span>
+                    </div>
+                    <div className="stat">
+                      <label>Health:</label>
+                      <span>{monster.health}/{monster.maxHealth}</span>
+                    </div>
+                    <div className="stat">
+                      <label>Total Damage:</label>
+                      <span>{score.totalDamage}</span>
+                    </div>
+                    <div className="stat">
+                      <label>Patterns Defeated:</label>
+                      <span>{score.patternsDefeated}</span>
+                    </div>
+                    <div className="stat">
+                      <label>Adaptations:</label>
+                      <span>{score.adaptations}</span>
+                    </div>
+                    <div className="stat">
+                      <label>Learning Efficiency:</label>
+                      <span>{(score.learningEfficiency * 100).toFixed(1)}%</span>
+                    </div>
+                  </div>
+                  
+                  <div className="monster-history">
+                    <h4>Recent Events</h4>
+                    {history.map((event, index) => (
+                      <div key={index} className="history-event">
+                        <span className="event-time">
+                          {new Date(event.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span className="event-type">{event.event}</span>
+                        <span className="event-details">
+                          {JSON.stringify(event.details)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+            <button 
+              className="close-button"
+              onClick={() => setSelectedMonster(null)}
             >
-              <div 
-                className={`resonator ${isActive ? 'active' : ''}`}
-                style={{
-                  animation: isActive ? `pulse ${60 / tempo}s infinite` : 'none',
-                  clipPath: generateSacredGeometryPath(pattern)
-                }}
-              />
-              <span className="ratio-label">{note.name}</span>
-              <span className="key-hint">{index + 1}</span>
+              Close
             </button>
-          );
-        })}
+          </div>
+        )}
       </div>
 
       <div className="visualizer-container">
@@ -476,6 +769,54 @@ function App() {
             onChange={handleVolumeChange}
           />
         </div>
+        
+        <div className="feedback-control">
+          <label>Feedback</label>
+          <input
+            type="range"
+            min="0"
+            max="0.8"
+            step="0.01"
+            value={feedbackLevel}
+            onChange={handleFeedbackChange}
+          />
+        </div>
+        
+        <div className="pattern-mix-control">
+          <label>Pattern Mix</label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={patternMixLevel}
+            onChange={handlePatternMixChange}
+          />
+        </div>
+
+        <div className="dialogue-controls">
+          <label>Dialogue Mode</label>
+          <div className="dialogue-buttons">
+            <button
+              className={dialogueMode === 'user' ? 'active' : ''}
+              onClick={() => handleDialogueModeChange('user')}
+            >
+              User
+            </button>
+            <button
+              className={dialogueMode === 'balanced' ? 'active' : ''}
+              onClick={() => handleDialogueModeChange('balanced')}
+            >
+              Balanced
+            </button>
+            <button
+              className={dialogueMode === 'system' ? 'active' : ''}
+              onClick={() => handleDialogueModeChange('system')}
+            >
+              System
+            </button>
+          </div>
+        </div>
       </div>
 
       <SpatialControls audioService={audioService} />
@@ -488,6 +829,11 @@ function App() {
       >
         {debugMode ? 'Hide Debug' : 'Show Debug'}
       </button>
+
+      <EmotionFeedback
+        emotionService={emotionService}
+        onEmotionalStateChange={setEmotionalState}
+      />
     </div>
   );
 }

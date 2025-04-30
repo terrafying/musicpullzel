@@ -10,11 +10,18 @@ license = "MIT"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+tch = "0.13"
+tract-onnx = "0.18"
+image = "0.24"
+anyhow = "1.0"
 wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.5"
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
 thiserror = "1.0"
-js-sys = "0.3"
 getrandom = { version = "0.2", features = ["js"] }
 rand = "0.8"
 rand_chacha = "0.3"

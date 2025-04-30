@@ -1191,17 +1191,405 @@
   animation: pulse 2s infinite;
 }
 
+.dialogue-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.dialogue-controls label {
+  color: #fff;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.dialogue-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.dialogue-buttons button {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.dialogue-buttons button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.dialogue-buttons button.active {
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.interactive-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: all;
+  z-index: 10;
+  background: transparent;
+}
+
+.interactive-canvas:hover {
+  cursor: crosshair;
+}
+
+.interactive-canvas.drawing {
+  cursor: crosshair;
+}
+
+.interactive-canvas.moving {
+  cursor: move;
+}
+
+/* Connection drawing feedback */
+.connection-preview {
+  position: absolute;
+  pointer-events: none;
+  z-index: 11;
+  background: linear-gradient(90deg, 
+    rgba(74, 144, 226, 0.2),
+    rgba(99, 245, 170, 0.2)
+  );
+  border-radius: 2px;
+  transform-origin: 0 50%;
+}
+
+/* Pattern hover effect */
+.pattern-hover {
+  position: absolute;
+  pointer-events: none;
+  z-index: 12;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
 @keyframes pulse {
   0% {
-    transform: translate(-50%, -50%) scale(0.8);
+    transform: scale(1);
     opacity: 0.5;
   }
   50% {
-    transform: translate(-50%, -50%) scale(1.2);
-    opacity: 0.2;
+    transform: scale(1.2);
+    opacity: 0.3;
   }
   100% {
-    transform: translate(-50%, -50%) scale(0.8);
+    transform: scale(1);
     opacity: 0.5;
   }
+}
+
+.monster-renderer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.monster {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  transition: all 0.3s ease;
+}
+
+.monster.harmonic {
+  background: radial-gradient(circle at center, #ff6b6b, #c92a2a);
+  box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+}
+
+.monster.rhythmic {
+  background: radial-gradient(circle at center, #4dabf7, #1971c2);
+  box-shadow: 0 0 20px rgba(77, 171, 247, 0.5);
+}
+
+.monster.chaotic {
+  background: radial-gradient(circle at center, #845ef7, #5f3dc4);
+  box-shadow: 0 0 20px rgba(132, 94, 247, 0.5);
+}
+
+.monster.defeated {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.5);
+}
+
+.monster.attacking {
+  animation: attack 0.5s ease-in-out;
+}
+
+@keyframes attack {
+  0% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.2); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+.monster-health {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.monster-health-bar {
+  height: 100%;
+  background: #51cf66;
+  transition: width 0.3s ease;
+}
+
+.monster-connection {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.6;
+  transition: all 0.3s ease;
+}
+
+.monster-connection.weak {
+  opacity: 0.3;
+}
+
+.monster-connection.strong {
+  opacity: 0.8;
+}
+
+.monster-info {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 8px;
+  padding: 15px;
+  color: white;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.monster-info h3 {
+  margin: 0 0 15px 0;
+  font-size: 1.2em;
+  color: #fff;
+  text-align: center;
+}
+
+.monster-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat label {
+  font-size: 0.8em;
+  color: #aaa;
+  text-transform: uppercase;
+}
+
+.stat span {
+  font-size: 1.1em;
+  color: #fff;
+}
+
+.monster-history {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+  padding-right: 10px;
+}
+
+.monster-history h4 {
+  margin: 0 0 10px 0;
+  font-size: 1em;
+  color: #fff;
+}
+
+.history-event {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  font-size: 0.9em;
+}
+
+.event-time {
+  color: #aaa;
+  font-size: 0.8em;
+}
+
+.event-type {
+  color: #fff;
+  font-weight: bold;
+}
+
+.event-details {
+  color: #ddd;
+  font-size: 0.9em;
+  word-break: break-all;
+}
+
+.close-button {
+  width: 100%;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.close-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Scrollbar styles for monster history */
+.monster-history::-webkit-scrollbar {
+  width: 6px;
+}
+
+.monster-history::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.monster-history::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.monster-history::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.progress-visualizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.progress-visualizer:hover {
+  opacity: 1;
+}
+
+/* Progress ring animations */
+@keyframes progress-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+}
+
+/* Semantic point animations */
+@keyframes semantic-glow {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+/* Monster indicator animations */
+@keyframes monster-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Health indicator animations */
+@keyframes health-fill {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.emotion-feedback {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  padding: 10px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.emotion-feedback:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.emotion-canvas {
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+@keyframes emotion-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.emotion-feedback.engaged {
+  animation: emotion-pulse 2s infinite;
 }
