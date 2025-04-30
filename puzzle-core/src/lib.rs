@@ -17,28 +17,96 @@ const NUM_POSITIONS: usize = 12;
 // A bitmask with all positions set
 const ALL_POSITIONS: u16 = 0b111111111111;
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[wasm_bindgen]
+#[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Debug)]
 pub enum Difficulty {
     Easy,
     Medium,
     Hard,
-    Expert
+    Expert,
 }
 
-#[derive(Serialize, Deserialize)]
+#[wasm_bindgen]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GameStats {
     pub moves: u32,
     pub time: f64,
     pub score: u32,
     pub difficulty: Difficulty,
-    pub completed: bool
+    pub completed: bool,
 }
 
 #[wasm_bindgen]
-extern "C" {
-    // Import the `window.alert` function from the Web
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
+pub struct Game {
+    difficulty: Difficulty,
+    moves: u32,
+    start_time: f64,
+    score: u32,
+    completed: bool,
+    rng: ChaCha8Rng,
+}
+
+#[wasm_bindgen]
+impl Game {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Game {
+        Game {
+            difficulty: Difficulty::Easy,
+            moves: 0,
+            start_time: js_sys::Date::now(),
+            score: 0,
+            completed: false,
+            rng: ChaCha8Rng::from_entropy(),
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn get_difficulty(&self) -> Difficulty {
+        self.difficulty
+    }
+
+    #[wasm_bindgen]
+    pub fn set_difficulty(&mut self, difficulty: Difficulty) {
+        self.difficulty = difficulty;
+    }
+
+    #[wasm_bindgen]
+    pub fn make_move(&mut self) {
+        self.moves += 1;
+        self.update_score();
+    }
+
+    #[wasm_bindgen]
+    pub fn complete_game(&mut self) {
+        self.completed = true;
+        self.update_score();
+    }
+
+    #[wasm_bindgen]
+    pub fn get_stats(&self) -> GameStats {
+        GameStats {
+            moves: self.moves,
+            time: (js_sys::Date::now() - self.start_time) / 1000.0,
+            score: self.score,
+            difficulty: self.difficulty,
+            completed: self.completed,
+        }
+    }
+
+    fn update_score(&mut self) {
+        let base_score: u32 = match self.difficulty {
+            Difficulty::Easy => 1000,
+            Difficulty::Medium => 2000,
+            Difficulty::Hard => 3000,
+            Difficulty::Expert => 5000,
+        };
+
+        let move_penalty: u32 = self.moves * 10;
+        let time_elapsed = (js_sys::Date::now() - self.start_time) / 1000.0;
+        let time_penalty: u32 = (time_elapsed * 5.0) as u32;
+
+        self.score = base_score.saturating_sub(move_penalty).saturating_sub(time_penalty);
+    }
 }
 
 /// The circle of fifths relationships
@@ -217,18 +285,17 @@ impl PuzzleState {
 
     /// Update the score based on current game state
     fn update_score(&mut self) {
-        let time_elapsed = (js_sys::Date::now() - self.start_time) / 1000.0;
-        let base_score = match self.difficulty {
+        let base_score: u32 = match self.difficulty {
             Difficulty::Easy => 1000,
             Difficulty::Medium => 2000,
             Difficulty::Hard => 3000,
-            Difficulty::Expert => 5000
+            Difficulty::Expert => 5000,
         };
 
-        // Calculate score based on moves and time
-        let move_penalty = self.moves * 10;
-        let time_penalty = (time_elapsed * 5.0) as u32;
-        
+        let move_penalty: u32 = self.moves * 10;
+        let time_elapsed = (js_sys::Date::now() - self.start_time) / 1000.0;
+        let time_penalty: u32 = (time_elapsed * 5.0) as u32;
+
         self.score = base_score.saturating_sub(move_penalty).saturating_sub(time_penalty);
     }
     
@@ -256,17 +323,6 @@ impl PuzzleState {
     pub fn set_target(&mut self, target: u16) {
         // Ensure only valid bits are set (only the first 12 bits)
         self.target = target & ALL_POSITIONS;
-    }
-
-    /// Get game statistics
-    pub fn get_stats(&self) -> GameStats {
-        GameStats {
-            moves: self.moves,
-            time: (js_sys::Date::now() - self.start_time) / 1000.0,
-            score: self.score,
-            difficulty: self.difficulty,
-            completed: self.is_solved()
-        }
     }
 }
 
