@@ -6,6 +6,11 @@ import { DebugPanel } from './components/DebugPanel'
 import ConnectionLines from './components/ConnectionLines'
 import AudioVisualizer from './components/AudioVisualizer'
 import { SpatialControls } from './components/SpatialControls'
+import { ConnectomeService } from './services/connectome'
+import PatternVisualizer from './components/PatternVisualizer'
+import AnalogicalVisualizer from './components/AnalogicalVisualizer'
+import PatternExplorer from './components/PatternExplorer'
+import { SharedStateService } from './services/sharedState'
 import './App.css'
 
 // Type definitions
@@ -91,6 +96,8 @@ const SACRED_PATTERNS = {
 function App() {
   const [audioService] = useState(() => new AudioService());
   const [puzzleService] = useState(() => new PuzzleService());
+  const [connectomeService] = useState(() => new ConnectomeService());
+  const [sharedStateService] = useState(() => new SharedStateService());
   const [activeNotes, setActiveNotes] = useState<number[]>([]);
   const [resonancePattern, setResonancePattern] = useState<ResonancePattern | null>(null);
   const [debugMode, setDebugMode] = useState(false);
@@ -123,6 +130,7 @@ function App() {
     positions: { x: number; y: number }[];
     opacity: number;
   }>>(new Map());
+  const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
   useEffect(() => {
     const initializeAudio = async () => {
@@ -235,6 +243,19 @@ function App() {
     return () => clearInterval(interval);
   }, [activeNotes, tempo]);
 
+  // Add resize handler
+  useEffect(() => {
+    const handleResize = () => {
+      setCanvasSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const toggleNote = (noteIndex: number) => {
     const pattern = puzzleService.toggleNote(noteIndex);
     setActiveNotes(pattern.activeNotes);
@@ -245,6 +266,9 @@ function App() {
       types: pattern.resonanceTypes
     });
     setPathways(pattern.pathways);
+    
+    // Update connectome resonance
+    connectomeService.updateResonance(pattern.activeNotes);
     
     const frequency = ratioToFrequency(noteVisuals[noteIndex].ratio);
     const { waveform, isRhythmic } = noteVisuals[noteIndex];
@@ -346,11 +370,32 @@ function App() {
       </div>
 
       <div className="game-board">
+        <PatternExplorer
+          connectomeService={connectomeService}
+          canvasSize={canvasSize}
+          sharedStateService={sharedStateService}
+        />
+        
+        <PatternVisualizer
+          patterns={connectomeService.getActivePatterns()}
+          canvasSize={canvasSize}
+          imaginaryField={connectomeService.getImaginaryField()}
+        />
+        
+        <AnalogicalVisualizer
+          patterns={connectomeService.getActivePatterns()}
+          mappings={connectomeService.getAnalogicalMappings()}
+          canvasSize={canvasSize}
+          imaginaryField={connectomeService.getImaginaryField()}
+          patternHistory={connectomeService.getPatternHistory()}
+        />
+        
         <ConnectionLines 
           activeNotes={activeNotes}
           resonatingPairs={resonatingPairs}
           pathways={pathways}
           noteVisuals={noteVisuals}
+          connectomeService={connectomeService}
         />
         
         {/* Render delay echoes */}
