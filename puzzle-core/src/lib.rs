@@ -211,7 +211,7 @@ impl PuzzleState {
 
     /// Generate a new puzzle based on difficulty
     fn generate_new_puzzle(&mut self) {
-        let mut rng = &mut self.rng;
+        let rng = &mut self.rng;
         
         // Generate target pattern based on difficulty
         let target = match self.difficulty {

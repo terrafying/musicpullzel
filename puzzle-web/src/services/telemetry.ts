@@ -19,76 +19,25 @@ export class TelemetryService {
     private static instance: TelemetryService;
     private config: TelemetryConfig;
     private logBuffer: LogEntry[] = [];
-    private readonly MAX_BUFFER_SIZE = 100;
+    private readonly MAX_BUFFER_SIZE = 1000;
 
-    private constructor(config: Partial<TelemetryConfig> = {}) {
+    private constructor() {
         this.config = {
-            minLevel: config.minLevel || 'info',
-            enableConsole: config.enableConsole ?? true,
-            enableRemote: config.enableRemote ?? false,
-            remoteEndpoint: config.remoteEndpoint,
+            minLevel: 'info',
+            enableConsole: true,
+            enableRemote: false
         };
     }
 
-    static getInstance(config?: Partial<TelemetryConfig>): TelemetryService {
+    static getInstance(): TelemetryService {
         if (!TelemetryService.instance) {
-            TelemetryService.instance = new TelemetryService(config);
+            TelemetryService.instance = new TelemetryService();
         }
         return TelemetryService.instance;
     }
 
-    private shouldLog(level: LogLevel): boolean {
-        const levels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
-        return levels.indexOf(level) >= levels.indexOf(this.config.minLevel);
-    }
-
-    private async sendToRemote(entry: LogEntry): Promise<void> {
-        if (!this.config.enableRemote || !this.config.remoteEndpoint) {
-            return;
-        }
-
-        try {
-            await fetch(this.config.remoteEndpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(entry),
-            });
-        } catch (error) {
-            console.error('Failed to send telemetry to remote endpoint:', error);
-        }
-    }
-
-    private log(level: LogLevel, message: string, context?: Record<string, unknown>, error?: Error): void {
-        if (!this.shouldLog(level)) {
-            return;
-        }
-
-        const entry: LogEntry = {
-            timestamp: Date.now(),
-            level,
-            message,
-            context,
-            error,
-        };
-
-        // Add to buffer
-        this.logBuffer.push(entry);
-        if (this.logBuffer.length > this.MAX_BUFFER_SIZE) {
-            this.logBuffer.shift();
-        }
-
-        // Console output
-        if (this.config.enableConsole) {
-            const logMethod = console[level] || console.log;
-            const contextStr = context ? ` ${JSON.stringify(context)}` : '';
-            const errorStr = error ? `\nError: ${error.stack || error.message}` : '';
-            logMethod(`[${new Date(entry.timestamp).toISOString()}] ${level.toUpperCase()}: ${message}${contextStr}${errorStr}`);
-        }
-
-        // Remote logging
-        this.sendToRemote(entry);
+    configure(config: Partial<TelemetryConfig>): void {
+        this.config = { ...this.config, ...config };
     }
 
     debug(message: string, context?: Record<string, unknown>): void {
@@ -107,11 +56,84 @@ export class TelemetryService {
         this.log('error', message, context, error);
     }
 
+    private log(
+        level: LogLevel,
+        message: string,
+        context?: Record<string, unknown>,
+        error?: Error
+    ): void {
+        if (!this.shouldLog(level)) return;
+
+        const entry: LogEntry = {
+            timestamp: Date.now(),
+            level,
+            message,
+            context,
+            error
+        };
+
+        this.logBuffer.push(entry);
+        if (this.logBuffer.length > this.MAX_BUFFER_SIZE) {
+            this.logBuffer.shift();
+        }
+
+        if (this.config.enableConsole) {
+            this.consoleLog(entry);
+        }
+
+        if (this.config.enableRemote && this.config.remoteEndpoint) {
+            this.sendToRemote(entry);
+        }
+    }
+
+    private shouldLog(level: LogLevel): boolean {
+        const levels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
+        return levels.indexOf(level) >= levels.indexOf(this.config.minLevel);
+    }
+
+    private consoleLog(entry: LogEntry): void {
+        const { level, message, context, error } = entry;
+        const timestamp = new Date(entry.timestamp).toISOString();
+        const contextStr = context ? JSON.stringify(context) : '';
+        const errorStr = error ? `\nError: ${error.message}\n${error.stack}` : '';
+
+        switch (level) {
+            case 'debug':
+                console.debug(`[${timestamp}] ${message} ${contextStr}${errorStr}`);
+                break;
+            case 'info':
+                console.info(`[${timestamp}] ${message} ${contextStr}${errorStr}`);
+                break;
+            case 'warn':
+                console.warn(`[${timestamp}] ${message} ${contextStr}${errorStr}`);
+                break;
+            case 'error':
+                console.error(`[${timestamp}] ${message} ${contextStr}${errorStr}`);
+                break;
+        }
+    }
+
+    private async sendToRemote(entry: LogEntry): Promise<void> {
+        if (!this.config.remoteEndpoint) return;
+
+        try {
+            await fetch(this.config.remoteEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(entry)
+            });
+        } catch (error) {
+            console.error('Failed to send log to remote endpoint:', error);
+        }
+    }
+
     getLogBuffer(): LogEntry[] {
         return [...this.logBuffer];
     }
 
-    clearBuffer(): void {
+    clearLogBuffer(): void {
         this.logBuffer = [];
     }
 } 
