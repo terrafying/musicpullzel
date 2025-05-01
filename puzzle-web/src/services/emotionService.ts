@@ -266,7 +266,12 @@ export class EmotionService {
     currentEmotion: string;
     emotionalStability: number;
     engagement: number;
-    homeostasis: typeof this.emotionalHomeostasis;
+    homeostasis: {
+      stability: number;
+      adaptation: number;
+      resonance: number;
+      coherence: number;
+    };
     resonance: number;
   } {
     if (this.emotionHistory.length === 0) {
