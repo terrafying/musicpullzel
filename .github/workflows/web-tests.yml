@@ -1,0 +1,74 @@
+name: Web Tests
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'music-egg-dimension-priority-one/puzzle-web/**'
+      - '.github/workflows/web-tests.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'music-egg-dimension-priority-one/puzzle-web/**'
+      - '.github/workflows/web-tests.yml'
+
+env:
+  REPO_ROOT: "music-egg-dimension-priority-one"
+
+jobs:
+  test:
+    name: Web Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.REPO_ROOT }}/puzzle-web/node_modules
+            ${{ env.REPO_ROOT }}/puzzle-web/.bun
+          key: ${{ runner.os }}-bun-${{ hashFiles('${{ env.REPO_ROOT }}/puzzle-web/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Validate web environment
+        run: |
+          cd ${{ env.REPO_ROOT }}/puzzle-web
+          test -f package.json || (echo "Missing package.json" && exit 1)
+          test -f tsconfig.json || (echo "Missing tsconfig.json" && exit 1)
+          test -d src || (echo "Missing src directory" && exit 1)
+
+      - name: Install dependencies
+        run: |
+          cd ${{ env.REPO_ROOT }}/puzzle-web
+          bun install --frozen-lockfile
+          bun pm ls
+
+      - name: Type check
+        run: |
+          cd ${{ env.REPO_ROOT }}/puzzle-web
+          bun run typecheck
+
+      - name: Run tests
+        run: |
+          cd ${{ env.REPO_ROOT }}/puzzle-web
+          bun test --coverage
+          
+          # Verify test coverage
+          if [ ! -f "coverage/lcov.info" ]; then
+            echo "Missing coverage report"
+            exit 1
+          fi
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: web-coverage
+          path: ${{ env.REPO_ROOT }}/puzzle-web/coverage/
+          retention-days: 7 

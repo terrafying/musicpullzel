@@ -4,15 +4,6 @@ use serde::{Serialize, Deserialize};
 use rand_chacha::ChaCha8Rng;
 use rand::SeedableRng;
 
-mod emotion;
-pub use emotion::*;
-
-// When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
-// allocator.
-#[cfg(feature = "wee_alloc")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
 // Notes in the chromatic scale (C, C#, D, D#, E, F, F#, G, G#, A, A#, B)
 const NUM_POSITIONS: usize = 12;
 

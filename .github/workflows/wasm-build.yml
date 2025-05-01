@@ -1,0 +1,102 @@
+name: WASM Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'music-egg-dimension-priority-one/puzzle-core/**'
+      - '.github/workflows/wasm-build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'music-egg-dimension-priority-one/puzzle-core/**'
+      - '.github/workflows/wasm-build.yml'
+
+env:
+  RUST_TOOLCHAIN: "stable"
+  WASM_TARGET: "wasm32-unknown-unknown"
+  REPO_ROOT: "music-egg-dimension-priority-one"
+
+jobs:
+  build:
+    name: Build WASM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libssl-dev clang llvm libc6-dev
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          override: true
+          target: ${{ env.WASM_TARGET }}
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ env.REPO_ROOT }}/puzzle-core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Get wasm-bindgen version
+        id: wasm-bindgen
+        run: |
+          cd ${{ env.REPO_ROOT }}/puzzle-core
+          VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
+          if [ -z "$VERSION" ]; then
+            echo "Could not determine wasm-bindgen version"
+            echo "Available packages:"
+            cargo metadata --format-version=1 --no-deps | jq -r '.packages[].name'
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Found wasm-bindgen version: $VERSION"
+
+      - name: Install wasm-bindgen-cli
+        run: |
+          if [ -z "${{ steps.wasm-bindgen.outputs.version }}" ]; then
+            echo "Error: wasm-bindgen version is empty"
+            exit 1
+          fi
+          echo "Installing wasm-bindgen-cli version: ${{ steps.wasm-bindgen.outputs.version }}"
+          cargo install wasm-bindgen-cli --version "${{ steps.wasm-bindgen.outputs.version }}" --no-default-features
+          wasm-bindgen --version
+
+      - name: Install wasm-pack
+        run: |
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          wasm-pack --version
+
+      - name: Build WASM
+        run: |
+          cd ${{ env.REPO_ROOT }}/puzzle-core
+          wasm-pack build --target web --verbose
+          
+          # Verify build output
+          ls -la pkg/
+          test -f pkg/puzzle_core_bg.wasm || (echo "Missing WASM binary" && exit 1)
+          test -f pkg/puzzle_core.js || (echo "Missing JS bindings" && exit 1)
+          test -f pkg/puzzle_core.d.ts || (echo "Missing TypeScript definitions" && exit 1)
+          
+          # Check WASM binary size
+          WASM_SIZE=$(stat -f%z pkg/puzzle_core_bg.wasm)
+          if [ "$WASM_SIZE" -gt 10485760 ]; then
+            echo "WASM binary too large: ${WASM_SIZE} bytes"
+            exit 1
+          fi
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: wasm-build
+          path: ${{ env.REPO_ROOT }}/puzzle-core/pkg/
+          retention-days: 7 

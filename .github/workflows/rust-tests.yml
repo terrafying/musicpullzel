@@ -1,0 +1,59 @@
+name: Rust Tests
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'music-egg-dimension-priority-one/puzzle-core/**'
+      - '.github/workflows/rust-tests.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'music-egg-dimension-priority-one/puzzle-core/**'
+      - '.github/workflows/rust-tests.yml'
+
+env:
+  RUST_TOOLCHAIN: "stable"
+  REPO_ROOT: "music-egg-dimension-priority-one"
+
+jobs:
+  test:
+    name: Rust Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libssl-dev clang llvm libc6-dev
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          override: true
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ env.REPO_ROOT }}/puzzle-core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run cargo tests
+        run: |
+          cd ${{ env.REPO_ROOT }}/puzzle-core
+          cargo test --verbose
+          cargo test --verbose --no-default-features
+          cargo test --verbose --all-features
+
+      - name: Run clippy
+        run: |
+          cd ${{ env.REPO_ROOT }}/puzzle-core
+          cargo clippy -- -D warnings 

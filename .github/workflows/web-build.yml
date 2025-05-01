@@ -1,0 +1,66 @@
+name: Web Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'music-egg-dimension-priority-one/puzzle-web/**'
+      - '.github/workflows/web-build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'music-egg-dimension-priority-one/puzzle-web/**'
+      - '.github/workflows/web-build.yml'
+
+env:
+  REPO_ROOT: "music-egg-dimension-priority-one"
+
+jobs:
+  build:
+    name: Build Web App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.REPO_ROOT }}/puzzle-web/node_modules
+            ${{ env.REPO_ROOT }}/puzzle-web/.bun
+          key: ${{ runner.os }}-bun-${{ hashFiles('${{ env.REPO_ROOT }}/puzzle-web/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: |
+          cd ${{ env.REPO_ROOT }}/puzzle-web
+          bun install --frozen-lockfile
+
+      - name: Build web app
+        run: |
+          cd ${{ env.REPO_ROOT }}/puzzle-web
+          bun run build
+          
+          # Verify build output
+          test -d dist || (echo "Missing dist directory" && exit 1)
+          test -f dist/index.html || (echo "Missing index.html" && exit 1)
+          
+          # Check bundle size
+          BUNDLE_SIZE=$(stat -f%z dist/assets/index-*.js)
+          if [ "$BUNDLE_SIZE" -gt 5242880 ]; then
+            echo "Bundle too large: ${BUNDLE_SIZE} bytes"
+            exit 1
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: web-build
+          path: ${{ env.REPO_ROOT }}/puzzle-web/dist/
+          retention-days: 7 
