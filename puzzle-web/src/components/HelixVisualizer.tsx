@@ -82,7 +82,7 @@ const HelixVisualizer: React.FC<HelixVisualizerProps> = ({
 
       return {
         x: canvas.width / 2 + Math.cos(phase) * HELIX_RADIUS,
-        y: canvas.height / 2 + progress * canvas.height - canvas.height / 2,
+        y: canvas.height / 2 + (progress * canvas.height - canvas.height / 2) * (HELIX_PITCH / 100),
         z: Math.sin(phase) * HELIX_RADIUS
       };
     };

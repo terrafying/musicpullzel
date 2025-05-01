@@ -27,6 +27,11 @@ jobs:
 
       - name: Validate Cargo.toml
         run: |
+          if [ ! -f "puzzle-core/Cargo.toml" ]; then
+            echo "Error: puzzle-core/Cargo.toml not found"
+            ls -la
+            exit 1
+          fi
           cd puzzle-core
           cargo check --verbose
           cargo metadata --format-version=1 > /dev/null
@@ -34,13 +39,24 @@ jobs:
       - name: Check for common issues
         run: |
           # Check for missing files
-          test -f puzzle-core/Cargo.toml || (echo "Missing Cargo.toml" && exit 1)
-          test -f puzzle-core/src/lib.rs || (echo "Missing lib.rs" && exit 1)
+          if [ ! -f "puzzle-core/Cargo.toml" ]; then
+            echo "Error: puzzle-core/Cargo.toml not found"
+            ls -la
+            exit 1
+          fi
+          if [ ! -f "puzzle-core/src/lib.rs" ]; then
+            echo "Error: puzzle-core/src/lib.rs not found"
+            ls -la puzzle-core/src
+            exit 1
+          fi
           
           # Check for valid wasm-bindgen version
+          cd puzzle-core
           VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
           if [ -z "$VERSION" ]; then
             echo "Could not determine wasm-bindgen version"
+            echo "Available packages:"
+            cargo metadata --format-version=1 --no-deps | jq -r '.packages[].name'
             exit 1
           fi
           
@@ -49,6 +65,7 @@ jobs:
             echo "Invalid wasm-bindgen version format: $VERSION"
             exit 1
           fi
+          echo "Found wasm-bindgen version: $VERSION"
 
   rust:
     name: Rust Tests & WASM Build
@@ -87,6 +104,8 @@ jobs:
           VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
           if [ -z "$VERSION" ]; then
             echo "Could not determine wasm-bindgen version"
+            echo "Available packages:"
+            cargo metadata --format-version=1 --no-deps | jq -r '.packages[].name'
             exit 1
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
