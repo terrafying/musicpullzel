@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import init, { PuzzleState } from './wasm/puzzle_core';
-import { MusicalBubbles } from './components/MusicalBubbles';
+import { MusicalWebGLVisualizer } from './components/MusicalWebGLVisualizer';
 import './App.css';
 
 // Error boundary component
@@ -107,13 +107,9 @@ function App() {
       <div className="App">
         <header>
           <h1>Musical Puzzle</h1>
-          <div className="stats">
-            <p>Moves: {puzzleState.get_moves()}</p>
-            <p>Score: {puzzleState.get_score()}</p>
-          </div>
         </header>
         <main>
-          <MusicalBubbles
+          <MusicalWebGLVisualizer
             puzzleState={puzzleState}
             onBubbleClick={handleBubbleClick}
           />
