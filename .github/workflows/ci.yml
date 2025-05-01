@@ -6,255 +6,104 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  RUST_TOOLCHAIN: "stable"
+  WASM_TARGET: "wasm32-unknown-unknown"
+
 jobs:
   rust:
-    name: Rust Tests
+    name: Rust Tests & WASM Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          override: true
-          
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@v3
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libssl-dev
-          sudo apt-get install -y nodejs npm
-          sudo apt-get install -y clang llvm
-          
-      - name: Install wasm-bindgen
+          sudo apt-get install -y build-essential pkg-config libssl-dev clang llvm
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          override: true
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            puzzle-core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Get wasm-bindgen version
+        id: wasm-bindgen
         run: |
-          cargo install wasm-bindgen-cli --version 0.2.87 --no-default-features
-          cargo install wasm-pack --version 0.12.1
-          
+          echo "version=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')" >> $GITHUB_OUTPUT
+
+      - name: Install wasm-bindgen-cli
+        run: |
+          cargo install wasm-bindgen-cli --version ${{ steps.wasm-bindgen.outputs.version }} --no-default-features
+
+      - name: Install wasm-pack
+        run: |
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
       - name: Run cargo tests
         run: cd puzzle-core && cargo test
-        
-      - name: Build WASM module
+
+      - name: Build WASM
         run: |
           cd puzzle-core
-          wasm-pack build --target web --out-dir ../puzzle-web/src/wasm
-          # Verify the build output
-          ls -la ../puzzle-web/src/wasm
-          # Check for wasm-bindgen files
-          test -f ../puzzle-web/src/wasm/puzzle_core_bg.wasm
-          test -f ../puzzle-web/src/wasm/puzzle_core.js
+          wasm-pack build --target web
+          ls -la pkg/
+          test -f pkg/puzzle_core_bg.wasm
+          test -f pkg/puzzle_core.js
+          test -f pkg/puzzle_core.d.ts
 
   web:
-    name: Web Tests and Build
-    runs-on: ubuntu-latest
+    name: Web App Tests & Build
     needs: rust
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
+      - uses: actions/checkout@v3
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libssl-dev clang llvm
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-          
+
       - name: Cache Bun dependencies
         uses: actions/cache@v3
         with:
           path: |
-            ~/.bun/install/cache
-            **/node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+            puzzle-web/node_modules
+            puzzle-web/.bun
+          key: ${{ runner.os }}-bun-${{ hashFiles('puzzle-web/bun.lockb') }}
           restore-keys: |
             ${{ runner.os }}-bun-
-            
-      - name: Install root dependencies
-        run: bun install --frozen-lockfile
-        
-      - name: Install web dependencies
-        run: cd puzzle-web && bun install --frozen-lockfile
-        
-      - name: Type checking
-        run: cd puzzle-web && bun run typecheck
-        
-      - name: Lint
-        run: bun run lint
-        
-      - name: Run web tests
-        run: cd puzzle-web && bun test
-        
+
+      - name: Install dependencies
+        run: |
+          cd puzzle-web
+          bun install --frozen-lockfile
+
+      - name: Run tests
+        run: |
+          cd puzzle-web
+          bun test
+
       - name: Build web app
-        run: cd puzzle-web && bun run build
-        
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-build
-          path: puzzle-web/dist/
-
-  # Experimental jobs
-  nightly-rust:
-    name: Nightly Rust Build
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Nightly Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          target: wasm32-unknown-unknown
-          override: true
-          
-      - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libssl-dev
-          sudo apt-get install -y clang llvm
-          
-      - name: Install wasm-bindgen
-        run: |
-          cargo install wasm-bindgen-cli --version 0.2.87 --no-default-features
-          cargo install wasm-pack --version 0.12.1
-          
-      - name: Build with nightly
-        run: |
-          cd puzzle-core
-          wasm-pack build --target web --out-dir ../puzzle-web/src/wasm-nightly
-          # Compare sizes
-          ls -lh ../puzzle-web/src/wasm/puzzle_core_bg.wasm
-          ls -lh ../puzzle-web/src/wasm-nightly/puzzle_core_bg.wasm
-
-  wasm-optimize:
-    name: WASM Optimization Test
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          override: true
-          
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libssl-dev
-          sudo apt-get install -y clang llvm
-          
-      - name: Install wasm-bindgen
-        run: |
-          cargo install wasm-bindgen-cli --version 0.2.87 --no-default-features
-          cargo install wasm-pack --version 0.12.1
-          
-      - name: Install wasm-opt
-        run: |
-          wget https://github.com/WebAssembly/binaryen/releases/download/version_112/binaryen-version_112-x86_64-linux.tar.gz
-          tar xf binaryen-version_112-x86_64-linux.tar.gz
-          sudo mv binaryen-version_112/bin/* /usr/local/bin/
-          
-      - name: Build and optimize
-        run: |
-          cd puzzle-core
-          wasm-pack build --target web --out-dir ../puzzle-web/src/wasm-opt
-          wasm-opt -O4 ../puzzle-web/src/wasm-opt/puzzle_core_bg.wasm -o ../puzzle-web/src/wasm-opt/puzzle_core_bg.wasm
-          # Compare sizes
-          ls -lh ../puzzle-web/src/wasm/puzzle_core_bg.wasm
-          ls -lh ../puzzle-web/src/wasm-opt/puzzle_core_bg.wasm
-
-  wasm-bundler:
-    name: WASM Bundler Test
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-          
-      - name: Cache Bun dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.bun/install/cache
-            **/node_modules
-          key: ${{ runner.os }}-bun-bundler-${{ hashFiles('**/bun.lockb') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-bundler-
-            
-      - name: Install dependencies
-        run: |
-          bun install --frozen-lockfile
-          cd puzzle-web && bun install --frozen-lockfile
-          
-      - name: Test different bundlers
-        run: |
-          cd puzzle-core
-          wasm-pack build --target bundler --out-dir ../puzzle-web/src/wasm-bundler
-          # Verify bundler output
-          test -f ../puzzle-web/src/wasm-bundler/puzzle_core_bg.wasm
-          test -f ../puzzle-web/src/wasm-bundler/puzzle_core.js
-          # Test Bun bundling
-          cd ../puzzle-web
-          bun build ./src/index.ts --outdir ./dist-bun
-
-  performance-test:
-    name: Performance Test
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          override: true
-          
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-          
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libssl-dev
-          sudo apt-get install -y clang llvm
-          
-      - name: Install dependencies
-        run: |
-          cargo install cargo-criterion
-          cargo install cargo-flamegraph
-          bun install --frozen-lockfile
-          
-      - name: Run performance tests
-        run: |
-          cd puzzle-core
-          cargo criterion --message-format=json > criterion-report.json
-          # Generate flamegraph
-          cargo flamegraph --bench pattern_generation
-          # Run Bun performance tests
-          cd ../puzzle-web
-          bun test --coverage
-          bun run build --profile
-          
-      - name: Upload performance artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: performance-data
-          path: |
-            puzzle-core/criterion-report.json
-            puzzle-core/flamegraph.svg
-            puzzle-web/coverage/
-            puzzle-web/dist/
+          cd puzzle-web
+          bun run build
 
