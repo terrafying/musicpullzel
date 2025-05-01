@@ -9,10 +9,50 @@ on:
 env:
   RUST_TOOLCHAIN: "stable"
   WASM_TARGET: "wasm32-unknown-unknown"
+  CARGO_TERM_COLOR: "always"
+  RUST_BACKTRACE: "1"
 
 jobs:
+  validate:
+    name: Validate Environment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
+          rustup show
+
+      - name: Validate Cargo.toml
+        run: |
+          cd puzzle-core
+          cargo check --verbose
+          cargo metadata --format-version=1 > /dev/null
+
+      - name: Check for common issues
+        run: |
+          # Check for missing files
+          test -f puzzle-core/Cargo.toml || (echo "Missing Cargo.toml" && exit 1)
+          test -f puzzle-core/src/lib.rs || (echo "Missing lib.rs" && exit 1)
+          
+          # Check for valid wasm-bindgen version
+          VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
+          if [ -z "$VERSION" ]; then
+            echo "Could not determine wasm-bindgen version"
+            exit 1
+          fi
+          
+          # Validate version format
+          if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid wasm-bindgen version format: $VERSION"
+            exit 1
+          fi
+
   rust:
     name: Rust Tests & WASM Build
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -43,27 +83,59 @@ jobs:
       - name: Get wasm-bindgen version
         id: wasm-bindgen
         run: |
-          echo "version=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')" >> $GITHUB_OUTPUT
+          cd puzzle-core
+          VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
+          if [ -z "$VERSION" ]; then
+            echo "Could not determine wasm-bindgen version"
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Found wasm-bindgen version: $VERSION"
 
       - name: Install wasm-bindgen-cli
         run: |
-          cargo install wasm-bindgen-cli --version ${{ steps.wasm-bindgen.outputs.version }} --no-default-features
+          if [ -z "${{ steps.wasm-bindgen.outputs.version }}" ]; then
+            echo "Error: wasm-bindgen version is empty"
+            exit 1
+          fi
+          echo "Installing wasm-bindgen-cli version: ${{ steps.wasm-bindgen.outputs.version }}"
+          cargo install wasm-bindgen-cli --version "${{ steps.wasm-bindgen.outputs.version }}" --no-default-features
+          wasm-bindgen --version
 
       - name: Install wasm-pack
         run: |
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          wasm-pack --version
 
       - name: Run cargo tests
-        run: cd puzzle-core && cargo test
+        run: |
+          cd puzzle-core
+          cargo test --verbose
+          cargo test --verbose --no-default-features
+          cargo test --verbose --all-features
+
+      - name: Run clippy
+        run: |
+          cd puzzle-core
+          cargo clippy -- -D warnings
 
       - name: Build WASM
         run: |
           cd puzzle-core
-          wasm-pack build --target web
+          wasm-pack build --target web --verbose
+          
+          # Verify build output
           ls -la pkg/
-          test -f pkg/puzzle_core_bg.wasm
-          test -f pkg/puzzle_core.js
-          test -f pkg/puzzle_core.d.ts
+          test -f pkg/puzzle_core_bg.wasm || (echo "Missing WASM binary" && exit 1)
+          test -f pkg/puzzle_core.js || (echo "Missing JS bindings" && exit 1)
+          test -f pkg/puzzle_core.d.ts || (echo "Missing TypeScript definitions" && exit 1)
+          
+          # Check WASM binary size
+          WASM_SIZE=$(stat -f%z pkg/puzzle_core_bg.wasm)
+          if [ "$WASM_SIZE" -gt 10485760 ]; then
+            echo "WASM binary too large: ${WASM_SIZE} bytes"
+            exit 1
+          fi
 
   web:
     name: Web App Tests & Build
@@ -92,18 +164,55 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
+      - name: Validate web environment
+        run: |
+          cd puzzle-web
+          test -f package.json || (echo "Missing package.json" && exit 1)
+          test -f tsconfig.json || (echo "Missing tsconfig.json" && exit 1)
+          test -d src || (echo "Missing src directory" && exit 1)
+
       - name: Install dependencies
         run: |
           cd puzzle-web
           bun install --frozen-lockfile
+          bun pm ls
+
+      - name: Type check
+        run: |
+          cd puzzle-web
+          bun run typecheck
 
       - name: Run tests
         run: |
           cd puzzle-web
-          bun test
+          bun test --coverage
+          
+          # Verify test coverage
+          if [ ! -f "coverage/lcov.info" ]; then
+            echo "Missing coverage report"
+            exit 1
+          fi
 
       - name: Build web app
         run: |
           cd puzzle-web
           bun run build
+          
+          # Verify build output
+          test -d dist || (echo "Missing dist directory" && exit 1)
+          test -f dist/index.html || (echo "Missing index.html" && exit 1)
+          
+          # Check bundle size
+          BUNDLE_SIZE=$(stat -f%z dist/assets/index-*.js)
+          if [ "$BUNDLE_SIZE" -gt 5242880 ]; then
+            echo "Bundle too large: ${BUNDLE_SIZE} bytes"
+            exit 1
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: web-build
+          path: puzzle-web/dist/
+          retention-days: 7
 
