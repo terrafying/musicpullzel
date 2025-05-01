@@ -1,6 +1,7 @@
 use puzzle_core::PuzzleState;
 
 // Basic integration tests for the puzzle core functionality
+// These tests run in the normal Rust test environment
 
 #[test]
 fn test_puzzle_creation() {

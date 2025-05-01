@@ -9,27 +9,27 @@ description = "Core library for the Harmonic Music Puzzle"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["wasm"]
-wasm = ["getrandom/js"]
+default = ["std"]
+wasm = ["getrandom/js", "wasm-bindgen", "js-sys", "web-sys", "serde-wasm-bindgen"]
 std = []
 
 [dependencies]
 # Core dependencies
-wasm-bindgen = { version = "0.2.87", features = ["serde-serialize"] }
-js-sys = "0.3.64"
-web-sys = { version = "0.3.64", features = ["console"] }
 serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = "0.6.1"
-
-# Random number generation - simplified to use a single implementation
-getrandom = { version = "0.2.10", features = ["js"] }
-rand = { version = "0.8.5", features = ["getrandom"] }
-
-# Error handling
 thiserror = "1.0.50"
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-futures = "0.4.37"
+# Random number generation
+getrandom = { version = "0.2.10", optional = true }
+rand = { version = "0.8.5", features = ["getrandom"] }
+
+# WASM dependencies
+wasm-bindgen = { version = "0.2.87", features = ["serde-serialize"], optional = true }
+js-sys = { version = "0.3.64", optional = true }
+web-sys = { version = "0.3.64", features = ["console"], optional = true }
+serde-wasm-bindgen = { version = "0.6.1", optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.37"
 
 [profile.release]
 opt-level = 3
@@ -46,4 +46,10 @@ codegen-units = 1
 members = ["."]
 
 [package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.profiling]
 wasm-opt = false

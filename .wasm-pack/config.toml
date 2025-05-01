@@ -1,0 +1,8 @@
+[wasm-pack]
+default-target = "web"
+
+[wasm-pack.profile.dev]
+wasm-opt = false
+
+[wasm-pack.profile.release]
+wasm-opt = false 

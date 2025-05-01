@@ -6,6 +6,7 @@ use puzzle_core::PuzzleState;
 wasm_bindgen_test_configure!(run_in_browser);
 
 // Tests specifically for the WASM build
+// These tests will only run in a WASM environment
 
 #[wasm_bindgen_test]
 fn test_wasm_puzzle_creation() {
@@ -46,10 +47,6 @@ fn test_wasm_invalid_input() {
 #[wasm_bindgen_test]
 fn test_wasm_solving_puzzle() {
     let mut puzzle = PuzzleState::new();
-    
-    // This is a simplified test since we can't easily find the
-    // exact sequence of moves to solve the puzzle
-    // For WASM testing, we just want to verify the API works
     
     // Set a simple target (only position 0 on)
     puzzle.set_target(1);
