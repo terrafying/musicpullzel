@@ -1,6 +1,6 @@
 import { PatternSynthService } from './patternSynth';
 
-interface EmergentPattern {
+export interface EmergentPattern {
   strength: number;
   type: 'harmonic' | 'rhythmic' | 'emergent';
   patternType: string;
