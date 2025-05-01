@@ -22,15 +22,32 @@ jobs:
           
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
-        
-      - name: Run cargo tests
-        run: cargo test --manifest-path puzzle-core/Cargo.toml
+
+      - name: Install wasm-bindgen-cli
+        run: cargo install wasm-bindgen-cli --version 0.2.87
         
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
         
+      - name: Install additional dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libssl-dev
+          sudo apt-get install -y nodejs npm
+          sudo npm install -g wasm-pack
+          
+      - name: Run cargo tests
+        run: cd puzzle-core && cargo test
+        
       - name: Build WASM module
-        run: wasm-pack build puzzle-core --target web --out-dir ../puzzle-web/src/wasm
+        run: |
+          cd puzzle-core
+          wasm-pack build --target web --out-dir ../puzzle-web/src/wasm
+          # Verify the build output
+          ls -la ../puzzle-web/src/wasm
+          # Check for wasm-bindgen files
+          test -f ../puzzle-web/src/wasm/puzzle_core_bg.wasm
+          test -f ../puzzle-web/src/wasm/puzzle_core.js
 
   web:
     name: Web Tests and Build
