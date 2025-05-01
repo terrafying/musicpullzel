@@ -8,6 +8,14 @@ interface PatternVisualizerProps {
   height?: number;
 }
 
+// Cessation kernel visualization constants
+const CESSATION_COLORS = {
+  collapse: '#FF6B6B', // Quantum red
+  decay: '#4ECDC4',    // Pattern teal
+  resonance: '#45B7D1', // Feedback blue
+  quantum: '#96CEB4'   // Quantum green
+} as const;
+
 export const PatternVisualizer: React.FC<PatternVisualizerProps> = ({
   patternGenerator,
   width = 800,
@@ -51,7 +59,64 @@ export const PatternVisualizer: React.FC<PatternVisualizerProps> = ({
         ctx.strokeStyle = getSymbolColor(node.symbol);
         ctx.lineWidth = 2;
         ctx.stroke();
+
+        // Draw cessation kernel visualization
+        drawCessationKernel(ctx, x, y, cellWidth, cellHeight, node);
       });
+    };
+
+    const drawCessationKernel = (
+      ctx: CanvasRenderingContext2D,
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      node: any
+    ) => {
+      const kernelType = getCessationKernelType(node);
+      const color = CESSATION_COLORS[kernelType];
+      
+      // Draw pre-nullification wave
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      
+      const points = 20;
+      const amplitude = height * 0.2;
+      const frequency = 2;
+      
+      for (let i = 0; i <= points; i++) {
+        const t = i / points;
+        const waveX = x + t * width;
+        const waveY = y + height * 0.7 + 
+          Math.sin(t * Math.PI * frequency) * amplitude * 
+          (1 - t); // Decay factor
+        
+        if (i === 0) {
+          ctx.moveTo(waveX, waveY);
+        } else {
+          ctx.lineTo(waveX, waveY);
+        }
+      }
+      
+      ctx.stroke();
+      
+      // Draw quantum collapse point
+      const collapseX = x + width * 0.8;
+      const collapseY = y + height * 0.7;
+      
+      ctx.beginPath();
+      ctx.arc(collapseX, collapseY, 3, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      
+      // Draw collapse trajectory
+      ctx.beginPath();
+      ctx.moveTo(collapseX, collapseY);
+      ctx.lineTo(collapseX + 10, collapseY + 10);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.stroke();
     };
 
     drawPattern();
@@ -88,4 +153,12 @@ const getSymbolColor = (symbol: string): string => {
     case '×': return '#45B7D1'; // Feedback blue
     default: return '#000000';
   }
+};
+
+const getCessationKernelType = (node: any): keyof typeof CESSATION_COLORS => {
+  // Determine kernel type based on node properties
+  if (node.strength > 0.8) return 'collapse';
+  if (node.strength > 0.6) return 'decay';
+  if (node.strength > 0.4) return 'resonance';
+  return 'quantum';
 }; 

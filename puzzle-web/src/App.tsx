@@ -28,6 +28,8 @@ import { SpaceMapService } from './services/spaceMapService'
 import './App.css'
 import { NoteState, SpatialPosition } from './services/audio/types'
 import HelixVisualizer from './components/HelixVisualizer'
+import { TestVisualizer } from './components/TestVisualizer'
+import { TestService, TestCase } from './services/testService'
 
 // Type definitions
 type NoteVisual = {
@@ -208,6 +210,7 @@ function App() {
     rotationSpeed: 0.5,
     isVisible: false
   });
+  const [testCases, setTestCases] = useState<TestCase[]>([]);
 
   // Consolidated game state
   const [gameState, setGameState] = useState<GameState>({
@@ -729,6 +732,31 @@ function App() {
     }));
   };
 
+  useEffect(() => {
+    // Subscribe to test case updates
+    const handleTestUpdate = (cases: TestCase[]) => {
+      setTestCases(cases);
+    };
+
+    testService.addListener(handleTestUpdate);
+    setTestCases(testService.getTestCases());
+
+    // Simulate test updates every 5 seconds
+    const interval = setInterval(() => {
+      testService.simulateTestUpdates();
+    }, 5000);
+
+    return () => {
+      testService.removeListener(handleTestUpdate);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleTestCaseClick = (testCase: TestCase) => {
+    logger.info('App', `Test case clicked: ${testCase.name}`);
+    // You can add additional handling here
+  };
+
   return (
     <div className="app-container" style={{
       backgroundColor: gameState.visual.isDarkMode ? '#1a1a1a' : '#ffffff',
@@ -1139,6 +1167,16 @@ function App() {
       >
         Toggle Dark Mode
       </button>
+
+      <div className="test-container">
+        <h2>Test Status</h2>
+        <TestVisualizer
+          testCases={testCases}
+          width={800}
+          height={200}
+          onTestCaseClick={handleTestCaseClick}
+        />
+      </div>
     </div>
   );
 }

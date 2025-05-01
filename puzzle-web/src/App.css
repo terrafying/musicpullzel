@@ -1770,3 +1770,60 @@
     background: rgba(255, 255, 255, 0.3);
     border-color: rgba(255, 255, 255, 0.4);
 }
+
+.test-container {
+  margin: 20px;
+  padding: 20px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.test-container h2 {
+  color: #333;
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+}
+
+.test-visualizer {
+  position: relative;
+  margin: 0 auto;
+}
+
+.test-visualizer canvas {
+  transition: all 0.3s ease;
+}
+
+.test-visualizer canvas:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Success state animations */
+@keyframes success-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.test-visualizer canvas:has(.passing) {
+  animation: success-pulse 2s infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .test-container {
+    margin: 10px;
+    padding: 10px;
+  }
+
+  .test-visualizer canvas {
+    width: 100%;
+    height: auto;
+  }
+}
