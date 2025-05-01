@@ -23,18 +23,17 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Install wasm-bindgen-cli
-        run: cargo install wasm-bindgen-cli --version 0.2.87
-        
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-        
-      - name: Install additional dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config libssl-dev
           sudo apt-get install -y nodejs npm
-          sudo npm install -g wasm-pack
+          sudo apt-get install -y clang llvm
+          
+      - name: Install wasm-bindgen
+        run: |
+          cargo install wasm-bindgen-cli --version 0.2.87 --no-default-features
+          cargo install wasm-pack --version 0.12.1
           
       - name: Run cargo tests
         run: cd puzzle-core && cargo test
@@ -110,10 +109,16 @@ jobs:
           target: wasm32-unknown-unknown
           override: true
           
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
-          cargo install wasm-bindgen-cli --version 0.2.87
-          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libssl-dev
+          sudo apt-get install -y clang llvm
+          
+      - name: Install wasm-bindgen
+        run: |
+          cargo install wasm-bindgen-cli --version 0.2.87 --no-default-features
+          cargo install wasm-pack --version 0.12.1
           
       - name: Build with nightly
         run: |
@@ -136,6 +141,17 @@ jobs:
           toolchain: stable
           target: wasm32-unknown-unknown
           override: true
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libssl-dev
+          sudo apt-get install -y clang llvm
+          
+      - name: Install wasm-bindgen
+        run: |
+          cargo install wasm-bindgen-cli --version 0.2.87 --no-default-features
+          cargo install wasm-pack --version 0.12.1
           
       - name: Install wasm-opt
         run: |
@@ -208,6 +224,12 @@ jobs:
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libssl-dev
+          sudo apt-get install -y clang llvm
           
       - name: Install dependencies
         run: |
