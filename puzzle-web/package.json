@@ -4,10 +4,13 @@
   "description": "Interactive stroke order visualization with musical feedback",
   "main": "src/main.tsx",
   "scripts": {
+    "dev": "vite",
     "start": "vite",
     "build": "tsc && vite build",
     "test": "jest",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
   },
   "dependencies": {
     "react": "^18.2.0",

@@ -127,7 +127,6 @@ impl WasmEmotionLLM {
         if self.endpoint.is_empty() {
             return Err(EmotionError::LLMError("Empty endpoint URL".to_string()));
         }
-        // Add more endpoint validation as needed
         Ok(())
     }
 

@@ -45,7 +45,6 @@ pub struct Game {
     start_time: f64,
     score: u32,
     completed: bool,
-    rng: ChaCha8Rng,
 }
 
 #[wasm_bindgen]
@@ -58,7 +57,6 @@ impl Game {
             start_time: js_sys::Date::now(),
             score: 0,
             completed: false,
-            rng: ChaCha8Rng::from_entropy(),
         }
     }
 

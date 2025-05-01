@@ -32,6 +32,7 @@ tract-onnx = { version = "0.18", optional = true }
 image = { version = "0.24", optional = true }
 tokio = { version = "1.0", features = ["full"], optional = true }
 statrs = { version = "0.16", optional = true }
+wasm-pack = "0.13.1"
 
 [features]
 default = ["wasm"]
