@@ -4,30 +4,116 @@ An innovative musical puzzle game that combines emotion detection, pattern recog
 
 ## Features
 
+### Implemented Features ✅
+
 - Real-time emotion detection using webcam input
+  - Dual implementation in JavaScript and Rust
+  - Emotion history tracking and confidence scoring
+  - Adaptive response based on emotional stability
+
 - Adaptive difficulty based on player emotional state
+  - Dynamic monster behavior adjustments
+  - Emotional state affects monster aggression, speed, and health
+  - Learning rate adaptation based on player engagement
+
 - Pattern-based puzzle mechanics with musical resonance
-- Monster AI that learns from player interactions
+  - Harmonic, rhythmic, and spatial pattern generation
+  - Resonance relationships between notes
+  - Dynamic pattern evolution and transformation
+
+- Monster AI with learning capabilities
+  - Strategy learning from player interactions
+  - Pattern adaptation and evolution
+  - Mini-history tracking for behavior analysis
+
 - Sacred geometry visualizations
-- Distributed LLM integration for enhanced gameplay
+  - Vesica, triquetra, tetrahedron patterns
+  - Pentagram, hexagram, and heptagram
+  - Dynamic pattern visualization with resonance fields
+
+### Planned Features 🚧
+
+- GPU-accelerated emotion detection
+- Multiplayer support
+- Advanced pattern generation using LLMs
+- Mobile support
+- VR/AR integration
 
 ## Technical Stack
 
 - **Frontend**: React, TypeScript, WebAssembly
 - **Core Logic**: Rust
+- **Package Manager**: Bun (for faster development and builds)
 - **Audio Processing**: Web Audio API
 - **Machine Learning**: ONNX Runtime, Custom Neural Networks
 - **Emotion Detection**: Face-API.js (Rust port in progress)
+
+## Development Setup
+
+### Prerequisites
+
+- [Rust](https://rustup.rs/) (stable toolchain)
+- [Bun](https://bun.sh/) (latest version)
+- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/music-puzzle.git
+   cd music-puzzle
+   ```
+
+2. Install dependencies:
+   ```bash
+   # Install root dependencies
+   bun install
+   
+   # Install web dependencies
+   cd puzzle-web
+   bun install
+   ```
+
+3. Build the WASM module:
+   ```bash
+   wasm-pack build puzzle-core --target web --out-dir ../puzzle-web/src/wasm
+   ```
+
+### Development Commands
+
+```bash
+# Run tests
+bun test
+
+# Run tests in watch mode
+bun test --watch
+
+# Run tests with coverage
+bun test --coverage
+
+# Type checking
+bun run typecheck
+
+# Linting
+bun run lint
+
+# Build the web app
+bun run build
+```
 
 ## Development Status
 
 The project is currently in active development, with several exciting features planned:
 
+### High Priority
 - [ ] GPU-accelerated emotion detection
 - [ ] Multiplayer support
 - [ ] Advanced pattern generation using LLMs
+
+### Medium Priority
 - [ ] Mobile support
 - [ ] VR/AR integration
+- [ ] Distributed LLM integration
 
 ## Support the Project
 
@@ -90,6 +176,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Face-API.js](https://github.com/justadudewhohacks/face-api.js) for emotion detection
 - [ONNX Runtime](https://github.com/microsoft/onnxruntime) for model inference
 - [Rust WebAssembly](https://rustwasm.github.io/) for performance optimization
+- [Bun](https://bun.sh/) for fast JavaScript runtime and package management
 
 ---
 

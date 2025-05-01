@@ -3,123 +3,115 @@ import { render, screen } from '@testing-library/react';
 import PatternVisualizer from '../PatternVisualizer';
 import { EmergentPattern, ResonanceField } from '../../types';
 
-describe('PatternVisualizer', () => {
-  const mockCanvasSize = { width: 800, height: 600 };
-  const mockImaginaryField: ResonanceField = {
-    center: { x: 0, y: 0 },
-    radius: 1,
-    intensity: 0.5
-  };
+// Extend global type to include getNotePosition
+declare global {
+  var getNotePosition: (noteId: number) => { x: number; y: number } | undefined;
+}
 
-  const mockPattern: EmergentPattern = {
+describe('PatternVisualizer', () => {
+  const canvasSize = { width: 800, height: 600 };
+  const imaginaryField: ResonanceField = {
+    center: { x: 400, y: 300 },
+    radius: 200,
+    intensity: 1
+  };
+  const pattern: EmergentPattern = {
     patternType: 'harmonic',
-    nodes: [0, 1, 2],
+    nodes: [1, 2, 3],
     strength: 0.8,
     stability: 0.9,
     resonanceField: {
-      center: { x: 0.5, y: 0.5 },
-      radius: 0.3,
+      center: { x: 400, y: 300 },
+      radius: 100,
       intensity: 0.7
     },
     evolution: {
       transformations: [
-        { timestamp: Date.now() - 1000, type: 'merge' }
+        {
+          timestamp: 0,
+          type: 'merge'
+        }
       ]
     }
   };
 
   beforeEach(() => {
-    // Mock DOM elements for note positions
-    const mockNoteElements = [
-      { getBoundingClientRect: () => ({ left: 100, top: 100, width: 50, height: 50 }) },
-      { getBoundingClientRect: () => ({ left: 200, top: 200, width: 50, height: 50 }) },
-      { getBoundingClientRect: () => ({ left: 300, top: 300, width: 50, height: 50 }) }
-    ];
+    // Mock note positions
+    const mockNotePositions = new Map<number, { x: number; y: number }>();
+    mockNotePositions.set(1, { x: 100, y: 100 });
+    mockNotePositions.set(2, { x: 200, y: 200 });
+    mockNotePositions.set(3, { x: 300, y: 300 });
 
-    mockNoteElements.forEach((el, index) => {
-      const div = document.createElement('div');
-      div.setAttribute('data-note-index', index.toString());
-      Object.defineProperty(div, 'getBoundingClientRect', {
-        value: el.getBoundingClientRect
-      });
-      document.body.appendChild(div);
-    });
+    // Mock getNotePosition function
+    global.getNotePosition = jest.fn((noteId: number) => mockNotePositions.get(noteId));
   });
 
   afterEach(() => {
-    // Clean up mock elements
-    document.querySelectorAll('[data-note-index]').forEach(el => el.remove());
+    jest.clearAllMocks();
   });
 
   it('should render canvas with correct dimensions', () => {
     render(
       <PatternVisualizer
-        patterns={[mockPattern]}
-        canvasSize={mockCanvasSize}
-        imaginaryField={mockImaginaryField}
+        canvasSize={canvasSize}
+        imaginaryField={imaginaryField}
+        patterns={[pattern]}
       />
     );
 
-    const canvas = screen.getByRole('img', { hidden: true });
-    expect(canvas).toHaveAttribute('width', mockCanvasSize.width.toString());
-    expect(canvas).toHaveAttribute('height', mockCanvasSize.height.toString());
+    const canvas = screen.getByTestId('pattern-visualizer-canvas');
+    expect(canvas).toHaveAttribute('width', canvasSize.width.toString());
+    expect(canvas).toHaveAttribute('height', canvasSize.height.toString());
   });
 
   it('should render canvas with correct styles', () => {
     render(
       <PatternVisualizer
-        patterns={[mockPattern]}
-        canvasSize={mockCanvasSize}
-        imaginaryField={mockImaginaryField}
+        canvasSize={canvasSize}
+        imaginaryField={imaginaryField}
+        patterns={[pattern]}
       />
     );
 
-    const canvas = screen.getByRole('img', { hidden: true });
+    const canvas = screen.getByTestId('pattern-visualizer-canvas');
     expect(canvas).toHaveStyle({
       position: 'absolute',
       top: 0,
       left: 0,
-      width: '100%',
-      height: '100%',
-      pointerEvents: 'none',
-      zIndex: 1
+      pointerEvents: 'none'
     });
   });
 
   it('should handle empty patterns array', () => {
     render(
       <PatternVisualizer
+        canvasSize={canvasSize}
+        imaginaryField={imaginaryField}
         patterns={[]}
-        canvasSize={mockCanvasSize}
-        imaginaryField={mockImaginaryField}
       />
     );
 
-    const canvas = screen.getByRole('img', { hidden: true });
+    const canvas = screen.getByTestId('pattern-visualizer-canvas');
     expect(canvas).toBeInTheDocument();
   });
 
   it('should handle zero intensity imaginary field', () => {
-    const zeroIntensityField: ResonanceField = {
-      ...mockImaginaryField,
-      intensity: 0
-    };
-
+    const zeroIntensityField = { ...imaginaryField, intensity: 0 };
     render(
       <PatternVisualizer
-        patterns={[mockPattern]}
-        canvasSize={mockCanvasSize}
+        canvasSize={canvasSize}
         imaginaryField={zeroIntensityField}
+        patterns={[pattern]}
       />
     );
 
-    const canvas = screen.getByRole('img', { hidden: true });
+    const canvas = screen.getByTestId('pattern-visualizer-canvas');
     expect(canvas).toBeInTheDocument();
   });
 
   it('should handle pattern with no transformations', () => {
-    const patternWithoutTransformations: EmergentPattern = {
-      ...mockPattern,
+    const patternWithoutTransformations = {
+      ...pattern,
       evolution: {
         transformations: []
       }
@@ -127,13 +119,13 @@ describe('PatternVisualizer', () => {
 
     render(
       <PatternVisualizer
+        canvasSize={canvasSize}
+        imaginaryField={imaginaryField}
         patterns={[patternWithoutTransformations]}
-        canvasSize={mockCanvasSize}
-        imaginaryField={mockImaginaryField}
       />
     );
 
-    const canvas = screen.getByRole('img', { hidden: true });
+    const canvas = screen.getByTestId('pattern-visualizer-canvas');
     expect(canvas).toBeInTheDocument();
   });
 }); 

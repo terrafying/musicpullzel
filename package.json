@@ -25,17 +25,17 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^22.14.1",
-    "@vitejs/plugin-react": "^4.4.1",
-    "concurrently": "^9.1.2",
-    "cross-env": "^7.0.3",
-    "eslint": "^9.25.1",
-    "husky": "^9.1.7",
-    "lint-staged": "^15.5.1",
-    "prettier": "^3.5.3",
-    "typescript": "^5.8.3",
-    "vite": "^6.3.3",
-    "wasm-pack": "^0.13.1"
+    "@types/node": "22.15.3",
+    "@vitejs/plugin-react": "4.4.1",
+    "concurrently": "9.1.2",
+    "cross-env": "7.0.3",
+    "eslint": "9.25.1",
+    "husky": "9.1.7",
+    "lint-staged": "15.5.1",
+    "prettier": "3.5.3",
+    "typescript": "5.8.3",
+    "vite": "6.3.4",
+    "wasm-pack": "0.13.1"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -50,7 +50,7 @@
     ]
   },
   "dependencies": {
-    "face-api.js": "^0.22.2",
+    "face-api.js": "0.22.2",
     "jest": "29.7.0"
   }
 }

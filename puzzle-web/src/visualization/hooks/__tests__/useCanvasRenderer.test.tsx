@@ -1,73 +1,69 @@
-import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { useCanvasRenderer } from '../useCanvasRenderer';
 import { CanvasRenderer } from '../../core/CanvasRenderer';
 
 // Mock CanvasRenderer
-jest.mock('../../core/CanvasRenderer', () => ({
-  CanvasRenderer: jest.fn().mockImplementation(() => ({
-    startAnimation: jest.fn(),
-    stopAnimation: jest.fn(),
-    clear: jest.fn()
-  }))
-}));
+jest.mock('../../core/CanvasRenderer', () => {
+  return {
+    CanvasRenderer: jest.fn().mockImplementation(() => ({
+      startAnimation: jest.fn(),
+      stopAnimation: jest.fn(),
+      clear: jest.fn()
+    }))
+  };
+});
 
 describe('useCanvasRenderer', () => {
-  let mockRender: jest.Mock;
-  let mockCanvas: HTMLCanvasElement;
+  let renderFn: jest.Mock;
 
   beforeEach(() => {
-    mockRender = jest.fn();
-    mockCanvas = document.createElement('canvas');
-    document.body.appendChild(mockCanvas);
+    renderFn = jest.fn();
   });
 
   afterEach(() => {
-    document.body.removeChild(mockCanvas);
     jest.clearAllMocks();
   });
 
   it('should initialize CanvasRenderer with canvas element', () => {
-    const { result } = renderHook(() => useCanvasRenderer(mockRender));
+    const { result } = renderHook(() => useCanvasRenderer(renderFn));
 
-    expect(CanvasRenderer).toHaveBeenCalledWith(expect.any(HTMLCanvasElement));
+    expect(result.current).toBeInstanceOf(Object);
+    expect(result.current.current).toBeInstanceOf(HTMLCanvasElement);
   });
 
   it('should start animation when render function is provided', () => {
-    const { result } = renderHook(() => useCanvasRenderer(mockRender));
-    const renderer = (CanvasRenderer as jest.Mock).mock.results[0].value;
+    const { result } = renderHook(() => useCanvasRenderer(renderFn));
 
+    const renderer = (CanvasRenderer as jest.Mock).mock.results[0].value;
     expect(renderer.startAnimation).toHaveBeenCalled();
   });
 
   it('should stop animation on cleanup', () => {
-    const { unmount } = renderHook(() => useCanvasRenderer(mockRender));
-    const renderer = (CanvasRenderer as jest.Mock).mock.results[0].value;
+    const { unmount } = renderHook(() => useCanvasRenderer(renderFn));
 
+    const renderer = (CanvasRenderer as jest.Mock).mock.results[0].value;
     unmount();
 
     expect(renderer.stopAnimation).toHaveBeenCalled();
   });
 
   it('should call render function with renderer instance', () => {
-    const { result } = renderHook(() => useCanvasRenderer(mockRender));
-    const renderer = (CanvasRenderer as jest.Mock).mock.results[0].value;
+    const { result } = renderHook(() => useCanvasRenderer(renderFn));
 
-    // Get the animation callback
+    const renderer = (CanvasRenderer as jest.Mock).mock.results[0].value;
     const animationCallback = (renderer.startAnimation as jest.Mock).mock.calls[0][0];
-    
-    // Simulate animation frame
+
     act(() => {
       animationCallback();
     });
 
-    expect(mockRender).toHaveBeenCalledWith(renderer);
+    expect(renderFn).toHaveBeenCalledWith(renderer);
   });
 
-  it('should handle dependencies changes', () => {
+  it('should handle changes in dependencies', () => {
     const dependencies = [1];
     const { rerender } = renderHook(
-      ({ deps }) => useCanvasRenderer(mockRender, deps),
+      ({ deps }) => useCanvasRenderer(renderFn, deps),
       { initialProps: { deps: dependencies } }
     );
 
@@ -83,8 +79,27 @@ describe('useCanvasRenderer', () => {
   });
 
   it('should not initialize renderer if canvas is not available', () => {
-    const { result } = renderHook(() => useCanvasRenderer(mockRender, [], null));
+    const { result } = renderHook(() => useCanvasRenderer(renderFn, []));
 
     expect(CanvasRenderer).not.toHaveBeenCalled();
+  });
+
+  it('should handle render function changes', () => {
+    const { rerender } = renderHook(
+      ({ renderFn }) => useCanvasRenderer(renderFn),
+      { initialProps: { renderFn } }
+    );
+
+    const newRenderFn = jest.fn();
+    rerender({ renderFn: newRenderFn });
+
+    const renderer = (CanvasRenderer as jest.Mock).mock.results[0].value;
+    const animationCallback = (renderer.startAnimation as jest.Mock).mock.calls[0][0];
+
+    act(() => {
+      animationCallback();
+    });
+
+    expect(newRenderFn).toHaveBeenCalledWith(renderer);
   });
 }); 

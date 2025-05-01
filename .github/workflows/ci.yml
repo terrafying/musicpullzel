@@ -39,29 +39,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: '18'
-          cache: 'npm'
+          bun-version: latest
           
       - name: Install root dependencies
-        run: npm ci
+        run: bun install
         
       - name: Install web dependencies
-        run: cd puzzle-web && npm ci
+        run: cd puzzle-web && bun install
         
       - name: Type checking
-        run: cd puzzle-web && npm run typecheck
+        run: cd puzzle-web && bun run typecheck
         
       - name: Lint
-        run: npm run lint
+        run: bun run lint
         
       - name: Run web tests
-        run: cd puzzle-web && npm test
+        run: cd puzzle-web && bun test
         
       - name: Build web app
-        run: cd puzzle-web && npm run build
+        run: cd puzzle-web && bun run build
         
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
