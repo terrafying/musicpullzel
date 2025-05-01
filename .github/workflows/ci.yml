@@ -25,47 +25,98 @@ jobs:
           cargo --version
           rustup show
 
-      - name: Validate Cargo.toml
+      - name: Paranoid file validation
         run: |
+          # Check for missing files with detailed error reporting
           if [ ! -f "puzzle-core/Cargo.toml" ]; then
             echo "Error: puzzle-core/Cargo.toml not found"
+            echo "Current directory contents:"
             ls -la
-            exit 1
-          fi
-          cd puzzle-core
-          cargo check --verbose
-          cargo metadata --format-version=1 > /dev/null
-
-      - name: Check for common issues
-        run: |
-          # Check for missing files
-          if [ ! -f "puzzle-core/Cargo.toml" ]; then
-            echo "Error: puzzle-core/Cargo.toml not found"
-            ls -la
-            exit 1
-          fi
-          if [ ! -f "puzzle-core/src/lib.rs" ]; then
-            echo "Error: puzzle-core/src/lib.rs not found"
-            ls -la puzzle-core/src
+            echo "Parent directory contents:"
+            ls -la ..
             exit 1
           fi
           
-          # Check for valid wasm-bindgen version
+          if [ ! -f "puzzle-core/src/lib.rs" ]; then
+            echo "Error: puzzle-core/src/lib.rs not found"
+            echo "puzzle-core directory contents:"
+            ls -la puzzle-core
+            echo "puzzle-core/src directory contents:"
+            ls -la puzzle-core/src
+            exit 1
+          fi
+
+          # Verify file permissions
+          if [ ! -r "puzzle-core/Cargo.toml" ]; then
+            echo "Error: puzzle-core/Cargo.toml is not readable"
+            ls -l puzzle-core/Cargo.toml
+            exit 1
+          fi
+
+          # Check for empty files
+          if [ ! -s "puzzle-core/Cargo.toml" ]; then
+            echo "Error: puzzle-core/Cargo.toml is empty"
+            exit 1
+          fi
+
+      - name: Paranoid wasm-bindgen validation
+        run: |
           cd puzzle-core
+          
+          # Verify Cargo.toml is valid
+          if ! cargo check --verbose; then
+            echo "Error: Cargo.toml validation failed"
+            exit 1
+          fi
+
+          # Check for wasm-bindgen in Cargo.toml
+          if ! grep -q "wasm-bindgen" Cargo.toml; then
+            echo "Error: wasm-bindgen not found in Cargo.toml"
+            echo "Cargo.toml contents:"
+            cat Cargo.toml
+            exit 1
+          fi
+
+          # Get wasm-bindgen version with multiple fallbacks
           VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
+          
           if [ -z "$VERSION" ]; then
             echo "Could not determine wasm-bindgen version"
             echo "Available packages:"
             cargo metadata --format-version=1 --no-deps | jq -r '.packages[].name'
+            echo "Checking Cargo.toml for wasm-bindgen dependency..."
+            grep -A 2 "wasm-bindgen" Cargo.toml
+            echo "Checking Cargo.lock for wasm-bindgen..."
+            grep -A 2 "wasm-bindgen" Cargo.lock
             exit 1
           fi
-          
+
           # Validate version format
           if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid wasm-bindgen version format: $VERSION"
+            echo "Raw version string: '$VERSION'"
             exit 1
           fi
+
+          # Verify version is within acceptable range
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          if [ "$MAJOR" -ne 0 ] || [ "$MINOR" -lt 2 ]; then
+            echo "Error: wasm-bindgen version $VERSION is not supported"
+            echo "Expected version >= 0.2.0"
+            exit 1
+          fi
+
           echo "Found wasm-bindgen version: $VERSION"
+          
+          # Verify the version matches Cargo.toml
+          TOML_VERSION=$(grep -A 2 "wasm-bindgen" Cargo.toml | grep "version" | sed -E 's/.*version.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          if [ "$VERSION" != "$TOML_VERSION" ]; then
+            echo "Error: wasm-bindgen version mismatch"
+            echo "Cargo.toml version: $TOML_VERSION"
+            echo "Resolved version: $VERSION"
+            exit 1
+          fi
 
   rust:
     name: Rust Tests & WASM Build
