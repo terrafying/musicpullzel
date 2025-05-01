@@ -61,11 +61,21 @@ jobs:
         with:
           bun-version: latest
           
+      - name: Cache Bun dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.bun/install/cache
+            **/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+            
       - name: Install root dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
         
       - name: Install web dependencies
-        run: cd puzzle-web && bun install
+        run: cd puzzle-web && bun install --frozen-lockfile
         
       - name: Type checking
         run: cd puzzle-web && bun run typecheck
@@ -149,15 +159,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: '18'
+          bun-version: latest
           
+      - name: Cache Bun dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.bun/install/cache
+            **/node_modules
+          key: ${{ runner.os }}-bun-bundler-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-bundler-
+            
       - name: Install dependencies
         run: |
-          npm install -g webpack webpack-cli
-          npm install -g @wasm-tool/wasm-pack-plugin
+          bun install --frozen-lockfile
+          cd puzzle-web && bun install --frozen-lockfile
           
       - name: Test different bundlers
         run: |
@@ -166,6 +186,9 @@ jobs:
           # Verify bundler output
           test -f ../puzzle-web/src/wasm-bundler/puzzle_core_bg.wasm
           test -f ../puzzle-web/src/wasm-bundler/puzzle_core.js
+          # Test Bun bundling
+          cd ../puzzle-web
+          bun build ./src/index.ts --outdir ./dist-bun
 
   performance-test:
     name: Performance Test
@@ -181,10 +204,16 @@ jobs:
           target: wasm32-unknown-unknown
           override: true
           
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+          
       - name: Install dependencies
         run: |
           cargo install cargo-criterion
           cargo install cargo-flamegraph
+          bun install --frozen-lockfile
           
       - name: Run performance tests
         run: |
@@ -192,6 +221,10 @@ jobs:
           cargo criterion --message-format=json > criterion-report.json
           # Generate flamegraph
           cargo flamegraph --bench pattern_generation
+          # Run Bun performance tests
+          cd ../puzzle-web
+          bun test --coverage
+          bun run build --profile
           
       - name: Upload performance artifacts
         uses: actions/upload-artifact@v4
@@ -200,4 +233,6 @@ jobs:
           path: |
             puzzle-core/criterion-report.json
             puzzle-core/flamegraph.svg
+            puzzle-web/coverage/
+            puzzle-web/dist/
 
