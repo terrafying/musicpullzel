@@ -1,5 +1,8 @@
 import { renderHook } from '@testing-library/react';
 import { EmotionState, Pattern, Interaction } from '../types';
+import React from 'react';
+import '@testing-library/jest-dom';
+import { jest } from '@jest/globals';
 
 // Mock types for feature testing
 export interface MockEmotionState extends EmotionState {
@@ -59,22 +62,10 @@ export const renderHookWithWrapper = <TProps, TResult>(
 ) => {
   return renderHook(hook, {
     initialProps,
-    wrapper: ({ children }) => (
+    wrapper: ({ children }: { children: React.ReactNode }) => (
       <div data-testid="test-wrapper">{children}</div>
     )
   });
-};
-
-// Mock webcam
-export const mockWebcam = {
-  getVideoTracks: () => [{
-    getSettings: () => ({ width: 640, height: 480 })
-  }]
-};
-
-// Mock media devices
-export const mockMediaDevices = {
-  getUserMedia: jest.fn().mockResolvedValue(mockWebcam)
 };
 
 // Mock fetch
@@ -113,21 +104,9 @@ export const measureFPS = async (
   return 1000 / avgFrameTime; // Convert to FPS
 };
 
-// Memory measurement helpers
-export const measureMemoryUsage = (): number => {
-  if (process.memoryUsage) {
-    return process.memoryUsage().heapUsed;
-  }
-  return 0;
-};
-
 // Setup and teardown helpers
 export const setupTestEnvironment = () => {
   // Mock global objects
-  Object.defineProperty(global.navigator, 'mediaDevices', {
-    value: mockMediaDevices,
-    writable: true
-  });
   Object.defineProperty(global, 'fetch', {
     value: mockFetch,
     writable: true
