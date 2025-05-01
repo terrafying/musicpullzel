@@ -1,0 +1,102 @@
+name: Workflow Checker
+
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+      - 'puzzle-core/Cargo.toml'
+      - 'package.json'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'puzzle-core/Cargo.toml'
+      - 'package.json'
+  schedule:
+    - cron: '0 0 * * 0'  # Run weekly
+
+jobs:
+  validate-workflows:
+    name: Validate Workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install actionlint
+        run: |
+          brew install actionlint || true
+          sudo wget -O /usr/local/bin/actionlint https://github.com/rhysd/actionlint/releases/latest/download/actionlint_linux_amd64
+          sudo chmod +x /usr/local/bin/actionlint
+
+      - name: Check workflow syntax
+        run: actionlint
+
+      - name: Validate dependencies
+        run: |
+          # Check for outdated dependencies
+          npm outdated || true
+          cargo outdated || true
+
+      - name: Check for common issues
+        run: |
+          # Check for missing cache keys
+          grep -r "actions/cache" .github/workflows/ | grep -v "key:" && echo "Missing cache keys found" && exit 1 || true
+          
+          # Check for missing permissions
+          grep -r "permissions:" .github/workflows/ || echo "Missing permissions block" && exit 1 || true
+          
+          # Check for proper concurrency settings
+          grep -r "concurrency:" .github/workflows/ || echo "Missing concurrency settings" && exit 1 || true
+
+      - name: Auto-fix common issues
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          # Create a new branch for fixes
+          git checkout -b fix/workflow-updates
+          
+          # Add missing permissions if needed
+          for workflow in .github/workflows/*.yml; do
+            if ! grep -q "permissions:" "$workflow"; then
+              sed -i '1i permissions:\n  contents: read\n  pull-requests: write' "$workflow"
+            fi
+          done
+          
+          # Add concurrency settings if needed
+          for workflow in .github/workflows/*.yml; do
+            if ! grep -q "concurrency:" "$workflow"; then
+              sed -i '/name:/a \  concurrency:\n    group: ${{ github.workflow }}-${{ github.ref }}\n    cancel-in-progress: true' "$workflow"
+            fi
+          done
+          
+          # Commit and push changes
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'github-actions@github.com'
+          git add .
+          git commit -m "chore: auto-fix workflow issues" || true
+          git push origin fix/workflow-updates || true
+
+      - name: Create Pull Request
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: auto-fix workflow issues"
+          title: "chore: auto-fix workflow issues"
+          body: |
+            Automated fixes for workflow issues:
+            - Added missing permissions
+            - Added concurrency settings
+            - Validated workflow syntax
+            - Checked for outdated dependencies
+          branch: fix/workflow-updates
+          base: main
+          labels: |
+            automated pr
+            workflow 

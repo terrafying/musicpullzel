@@ -1,0 +1,15 @@
+[install]
+# Use exact versions for dependencies
+exact = true
+
+[test]
+# Enable TypeScript for tests
+typescript = true
+
+[build]
+# Enable source maps for better debugging
+sourcemap = true
+
+[dev]
+# Enable hot reloading
+hot = true 
