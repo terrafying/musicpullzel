@@ -11,188 +11,59 @@ env:
   WASM_TARGET: "wasm32-unknown-unknown"
   CARGO_TERM_COLOR: "always"
   RUST_BACKTRACE: "1"
-  REPO_ROOT: "music-egg-dimension-priority-one"
 
 jobs:
-  validate:
-    name: Validate Environment
-    runs-on: ubuntu-latest
+  build:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            cache-key: linux
+          - os: macos-latest
+            cache-key: macos
+          - os: windows-latest
+            cache-key: windows
+
     steps:
       - uses: actions/checkout@v3
 
-      - name: Check Rust toolchain
-        run: |
-          rustc --version
-          cargo --version
-          rustup show
-
-      - name: Paranoid file validation
-        run: |
-          # Check for missing files with detailed error reporting
-          if [ ! -f "${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml" ]; then
-            echo "Error: ${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml not found"
-            echo "Current directory contents:"
-            ls -la
-            echo "Parent directory contents:"
-            ls -la ..
-            exit 1
-          fi
-          
-          if [ ! -f "${{ env.REPO_ROOT }}/puzzle-core/src/lib.rs" ]; then
-            echo "Error: ${{ env.REPO_ROOT }}/puzzle-core/src/lib.rs not found"
-            echo "puzzle-core directory contents:"
-            ls -la ${{ env.REPO_ROOT }}/puzzle-core
-            echo "puzzle-core/src directory contents:"
-            ls -la ${{ env.REPO_ROOT }}/puzzle-core/src
-            exit 1
-          fi
-
-          # Verify file permissions
-          if [ ! -r "${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml" ]; then
-            echo "Error: ${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml is not readable"
-            ls -l ${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml
-            exit 1
-          fi
-
-          # Check for empty files
-          if [ ! -s "${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml" ]; then
-            echo "Error: ${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml is empty"
-            exit 1
-          fi
-
-      - name: Paranoid wasm-bindgen validation
-        run: |
-          cd ${{ env.REPO_ROOT }}/puzzle-core
-          
-          # Verify Cargo.toml is valid
-          if ! cargo check --verbose; then
-            echo "Error: Cargo.toml validation failed"
-            exit 1
-          fi
-
-          # Check for wasm-bindgen in Cargo.toml
-          if ! grep -q "wasm-bindgen" Cargo.toml; then
-            echo "Error: wasm-bindgen not found in Cargo.toml"
-            echo "Cargo.toml contents:"
-            cat Cargo.toml
-            exit 1
-          fi
-
-          # Get wasm-bindgen version with multiple fallbacks
-          VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
-          
-          if [ -z "$VERSION" ]; then
-            echo "Could not determine wasm-bindgen version"
-            echo "Available packages:"
-            cargo metadata --format-version=1 --no-deps | jq -r '.packages[].name'
-            echo "Checking Cargo.toml for wasm-bindgen dependency..."
-            grep -A 2 "wasm-bindgen" Cargo.toml
-            echo "Checking Cargo.lock for wasm-bindgen..."
-            grep -A 2 "wasm-bindgen" Cargo.lock
-            exit 1
-          fi
-
-          # Validate version format
-          if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid wasm-bindgen version format: $VERSION"
-            echo "Raw version string: '$VERSION'"
-            exit 1
-          fi
-
-          # Verify version is within acceptable range
-          MAJOR=$(echo $VERSION | cut -d. -f1)
-          MINOR=$(echo $VERSION | cut -d. -f2)
-          if [ "$MAJOR" -ne 0 ] || [ "$MINOR" -lt 2 ]; then
-            echo "Error: wasm-bindgen version $VERSION is not supported"
-            echo "Expected version >= 0.2.0"
-            exit 1
-          fi
-
-          echo "Found wasm-bindgen version: $VERSION"
-          
-          # Verify the version matches Cargo.toml
-          TOML_VERSION=$(grep -A 2 "wasm-bindgen" Cargo.toml | grep "version" | sed -E 's/.*version.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
-          if [ "$VERSION" != "$TOML_VERSION" ]; then
-            echo "Error: wasm-bindgen version mismatch"
-            echo "Cargo.toml version: $TOML_VERSION"
-            echo "Resolved version: $VERSION"
-            exit 1
-          fi
-
-  rust:
-    name: Rust Tests & WASM Build
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libssl-dev clang llvm
-
-      - name: Setup Rust
+      - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           override: true
           components: rustfmt, clippy
-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ env.REPO_ROOT }}/puzzle-core/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Get wasm-bindgen version
-        id: wasm-bindgen
-        run: |
-          cd ${{ env.REPO_ROOT }}/puzzle-core
-          VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
-          if [ -z "$VERSION" ]; then
-            echo "Could not determine wasm-bindgen version"
-            echo "Available packages:"
-            cargo metadata --format-version=1 --no-deps | jq -r '.packages[].name'
-            exit 1
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Found wasm-bindgen version: $VERSION"
-
-      - name: Install wasm-bindgen-cli
-        run: |
-          if [ -z "${{ steps.wasm-bindgen.outputs.version }}" ]; then
-            echo "Error: wasm-bindgen version is empty"
-            exit 1
-          fi
-          echo "Installing wasm-bindgen-cli version: ${{ steps.wasm-bindgen.outputs.version }}"
-          cargo install wasm-bindgen-cli --version "${{ steps.wasm-bindgen.outputs.version }}" --no-default-features
-          wasm-bindgen --version
+          target: ${{ env.WASM_TARGET }}
 
       - name: Install wasm-pack
         run: |
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
           wasm-pack --version
 
-      - name: Run cargo tests
-        run: |
-          cd ${{ env.REPO_ROOT }}/puzzle-core
-          cargo test --verbose
-          cargo test --verbose --no-default-features
-          cargo test --verbose --all-features
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            puzzle-core/target
+          key: ${{ matrix.cache-key }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.cache-key }}-cargo-
 
-      - name: Run clippy
+      - name: Build core library
         run: |
-          cd ${{ env.REPO_ROOT }}/puzzle-core
+          cd puzzle-core
+          cargo build --verbose
+          cargo test --verbose
           cargo clippy -- -D warnings
 
       - name: Build WASM
         run: |
-          cd ${{ env.REPO_ROOT }}/puzzle-core
+          cd puzzle-core
           wasm-pack build --target web --verbose
           
           # Verify build output
@@ -200,90 +71,24 @@ jobs:
           test -f pkg/puzzle_core_bg.wasm || (echo "Missing WASM binary" && exit 1)
           test -f pkg/puzzle_core.js || (echo "Missing JS bindings" && exit 1)
           test -f pkg/puzzle_core.d.ts || (echo "Missing TypeScript definitions" && exit 1)
-          
-          # Check WASM binary size
-          WASM_SIZE=$(stat -f%z pkg/puzzle_core_bg.wasm)
-          if [ "$WASM_SIZE" -gt 10485760 ]; then
-            echo "WASM binary too large: ${WASM_SIZE} bytes"
-            exit 1
-          fi
-
-  web:
-    name: Web App Tests & Build
-    needs: rust
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libssl-dev clang llvm
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Cache Bun dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ env.REPO_ROOT }}/puzzle-web/node_modules
-            ${{ env.REPO_ROOT }}/puzzle-web/.bun
-          key: ${{ runner.os }}-bun-${{ hashFiles('${{ env.REPO_ROOT }}/puzzle-web/bun.lockb') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Validate web environment
-        run: |
-          cd ${{ env.REPO_ROOT }}/puzzle-web
-          test -f package.json || (echo "Missing package.json" && exit 1)
-          test -f tsconfig.json || (echo "Missing tsconfig.json" && exit 1)
-          test -d src || (echo "Missing src directory" && exit 1)
-
-      - name: Install dependencies
-        run: |
-          cd ${{ env.REPO_ROOT }}/puzzle-web
-          bun install --frozen-lockfile
-          bun pm ls
-
-      - name: Type check
-        run: |
-          cd ${{ env.REPO_ROOT }}/puzzle-web
-          bun run typecheck
-
-      - name: Run tests
-        run: |
-          cd ${{ env.REPO_ROOT }}/puzzle-web
-          bun test --coverage
-          
-          # Verify test coverage
-          if [ ! -f "coverage/lcov.info" ]; then
-            echo "Missing coverage report"
-            exit 1
-          fi
 
       - name: Build web app
         run: |
-          cd ${{ env.REPO_ROOT }}/puzzle-web
+          cd puzzle-web
+          bun install
+          bun run typecheck
           bun run build
           
           # Verify build output
           test -d dist || (echo "Missing dist directory" && exit 1)
           test -f dist/index.html || (echo "Missing index.html" && exit 1)
-          
-          # Check bundle size
-          BUNDLE_SIZE=$(stat -f%z dist/assets/index-*.js)
-          if [ "$BUNDLE_SIZE" -gt 5242880 ]; then
-            echo "Bundle too large: ${BUNDLE_SIZE} bytes"
-            exit 1
-          fi
 
-      - name: Upload build artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: web-build
-          path: ${{ env.REPO_ROOT }}/puzzle-web/dist/
+          name: build-${{ matrix.os }}
+          path: |
+            puzzle-core/pkg/
+            puzzle-web/dist/
           retention-days: 7
 

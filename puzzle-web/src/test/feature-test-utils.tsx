@@ -1,4 +1,3 @@
-import React from 'react';
 import { renderHook } from '@testing-library/react';
 import { EmotionState, Pattern, Interaction } from '../types';
 
@@ -60,7 +59,7 @@ export const renderHookWithWrapper = <TProps, TResult>(
 ) => {
   return renderHook(hook, {
     initialProps,
-    wrapper: ({ children }: { children: React.ReactNode }) => (
+    wrapper: ({ children }) => (
       <div data-testid="test-wrapper">{children}</div>
     )
   });
@@ -129,7 +128,10 @@ export const setupTestEnvironment = () => {
     value: mockMediaDevices,
     writable: true
   });
-  global.fetch = mockFetch;
+  Object.defineProperty(global, 'fetch', {
+    value: mockFetch,
+    writable: true
+  });
 
   // Reset mocks
   jest.clearAllMocks();

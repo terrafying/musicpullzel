@@ -1,8 +1,6 @@
 use wasm_bindgen::prelude::*;
 use rand::prelude::*;
 use serde::{Serialize, Deserialize};
-use rand_chacha::ChaCha8Rng;
-use rand::SeedableRng;
 
 // Notes in the chromatic scale (C, C#, D, D#, E, F, F#, G, G#, A, A#, B)
 const NUM_POSITIONS: usize = 12;
@@ -139,9 +137,6 @@ pub struct PuzzleState {
 
     /// Current score
     score: u32,
-
-    /// Random number generator
-    rng: ChaCha8Rng
 }
 
 #[wasm_bindgen]
@@ -160,7 +155,6 @@ impl PuzzleState {
             difficulty: Difficulty::Easy,
             start_time: js_sys::Date::now(),
             score: 0,
-            rng: ChaCha8Rng::from_entropy()
         }
     }
     
@@ -200,7 +194,7 @@ impl PuzzleState {
 
     /// Generate a new puzzle based on difficulty
     fn generate_new_puzzle(&mut self) {
-        let rng = &mut self.rng;
+        let mut rng = rand::thread_rng();
         
         // Generate target pattern based on difficulty
         let target = match self.difficulty {

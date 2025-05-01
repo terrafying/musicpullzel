@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "bun run build:wasm && concurrently \"bun run build:wasm:watch\" \"cd puzzle-web && bun run dev\"",
     "build": "bun run build:wasm && cd puzzle-web && bun run build",
-    "build:wasm": "cd puzzle-core && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory' wasm-pack build --target web --out-dir ../puzzle-web/src/wasm -- --no-default-features --features wasm",
-    "build:wasm:watch": "cd puzzle-core && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory' cargo watch -s 'wasm-pack build --target web --out-dir ../puzzle-web/src/wasm -- --no-default-features --features wasm'",
+    "build:wasm": "cd puzzle-core && wasm-pack build --target web --out-dir ../puzzle-web/src/wasm -- --no-default-features --features wasm",
+    "build:wasm:watch": "cd puzzle-core && cargo watch -s 'wasm-pack build --target web --out-dir ../puzzle-web/src/wasm -- --no-default-features --features wasm'",
     "test": "bun run test:rust && cd puzzle-web && bun run test",
     "test:rust": "cargo test --manifest-path puzzle-core/Cargo.toml",
     "lint": "eslint \"puzzle-web/**/*.{ts,tsx}\"",
