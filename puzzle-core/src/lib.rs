@@ -4,6 +4,9 @@ use serde::{Serialize, Deserialize};
 use rand_chacha::ChaCha8Rng;
 use rand::SeedableRng;
 
+mod emotion;
+pub use emotion::*;
+
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
 #[cfg(feature = "wee_alloc")]

@@ -4,11 +4,11 @@
   "description": "Interactive music-based puzzle game with Rust core and web frontend",
   "private": true,
   "scripts": {
-    "dev": "npm run build:wasm:watch & npm --prefix puzzle-web run dev",
-    "build": "npm run build:wasm && npm --prefix puzzle-web run build",
-    "build:wasm": "wasm-pack build puzzle-core --target web --out-dir ../puzzle-web/src/wasm",
-    "build:wasm:watch": "wasm-pack build --watch puzzle-core --target web --out-dir ../puzzle-web/src/wasm",
-    "test": "npm run test:rust && npm --prefix puzzle-web run test",
+    "dev": "bun run build:wasm && concurrently \"bun run build:wasm:watch\" \"cd puzzle-web && bun run dev\"",
+    "build": "bun run build:wasm && cd puzzle-web && bun run build",
+    "build:wasm": "cd puzzle-core && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory' wasm-pack build --target web --out-dir ../puzzle-web/src/wasm -- --no-default-features --features wasm",
+    "build:wasm:watch": "cd puzzle-core && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory' cargo watch -s 'wasm-pack build --target web --out-dir ../puzzle-web/src/wasm -- --no-default-features --features wasm'",
+    "test": "bun run test:rust && cd puzzle-web && bun run test",
     "test:rust": "cargo test --manifest-path puzzle-core/Cargo.toml",
     "lint": "eslint \"puzzle-web/**/*.{ts,tsx}\"",
     "fmt": "prettier --write \"**/*.{ts,tsx,rs,md}\"",
@@ -35,7 +35,8 @@
     "prettier": "3.5.3",
     "typescript": "5.8.3",
     "vite": "6.3.4",
-    "wasm-pack": "0.13.1"
+    "wasm-pack": "0.13.1",
+    "cargo-watch": "^8.4.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

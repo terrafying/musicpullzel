@@ -1,7 +1,8 @@
-import init, { GameState, Difficulty } from 'puzzle-core';
+import init, { PuzzleState, Game, Difficulty } from 'puzzle-core';
 
 export class WasmService {
-  private gameState: GameState | null = null;
+  private gameState: Game | null = null;
+  private puzzleState: PuzzleState | null = null;
   private initialized = false;
 
   async initialize() {
@@ -13,19 +14,30 @@ export class WasmService {
 
   async createGame(difficulty: Difficulty) {
     await this.initialize();
-    this.gameState = GameState.new(difficulty);
+    this.gameState = new Game();
+    this.gameState.set_difficulty(difficulty);
+    this.puzzleState = new PuzzleState();
+    this.puzzleState.set_difficulty(difficulty);
     return this.gameState;
   }
 
-  getGameState(): GameState | null {
+  getGameState(): Game | null {
     return this.gameState;
   }
 
-  async makeGuess(guess: number): Promise<boolean> {
-    if (!this.gameState) {
+  getPuzzleState(): PuzzleState | null {
+    return this.puzzleState;
+  }
+
+  async makeMove(position: number): Promise<boolean> {
+    if (!this.puzzleState) {
       throw new Error('Game not initialized');
     }
-    return this.gameState.make_guess(guess);
+    const result = this.puzzleState.toggle(position);
+    if (this.gameState) {
+      this.gameState.make_move();
+    }
+    return result;
   }
 
   getStats() {
@@ -36,10 +48,13 @@ export class WasmService {
   }
 
   getPattern() {
-    if (!this.gameState) {
+    if (!this.puzzleState) {
       throw new Error('Game not initialized');
     }
-    return this.gameState.get_pattern();
+    return {
+      current: this.puzzleState.get_bits(),
+      target: this.puzzleState.get_target()
+    };
   }
 
   getDifficulty() {

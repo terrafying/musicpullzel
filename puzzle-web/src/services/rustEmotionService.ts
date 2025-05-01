@@ -1,11 +1,6 @@
-import init, { WasmEmotionDetector, WasmEmotionLLM } from 'puzzle-core';
+import init, { WasmEmotionDetector, WasmEmotionLLM, EmotionState } from 'puzzle-core';
 
-export interface EmotionState {
-    dominant_emotion: string;
-    intensity: number;
-    confidence: number;
-    timestamp: number;
-}
+export { EmotionState };
 
 export class RustEmotionService {
     private detector: WasmEmotionDetector | null = null;
@@ -18,7 +13,7 @@ export class RustEmotionService {
         if (this.isInitialized) return;
 
         await init();
-        this.detector = await WasmEmotionDetector.new();
+        this.detector = new WasmEmotionDetector();
         this.llm = new WasmEmotionLLM(this.llmEndpoint);
         this.isInitialized = true;
     }
@@ -40,10 +35,11 @@ export class RustEmotionService {
         ctx.drawImage(videoElement, 0, 0);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         
-        const frame = new Uint8Array(imageData.data.buffer);
-        const emotionState = await this.detector.process_frame(frame, canvas.width, canvas.height);
-        
-        return emotionState as unknown as EmotionState;
+        return this.detector.process_frame(
+            new Uint8Array(imageData.data), 
+            canvas.width, 
+            canvas.height
+        );
     }
 
     async analyzeEmotionContext(emotionState: EmotionState): Promise<string> {
@@ -51,8 +47,7 @@ export class RustEmotionService {
             throw new Error('Emotion LLM not initialized');
         }
 
-        const analysis = await this.llm.analyze_emotion(emotionState as any);
-        return analysis as unknown as string;
+        return this.llm.analyze_emotion(emotionState);
     }
 
     async startDetection(videoElement: HTMLVideoElement, callback: (state: EmotionState) => void): Promise<void> {
@@ -74,7 +69,6 @@ export class RustEmotionService {
     }
 
     stopDetection(): void {
-        // Cleanup will be handled by the Rust side
         this.detector = null;
         this.llm = null;
         this.isInitialized = false;

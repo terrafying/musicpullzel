@@ -1,143 +1,81 @@
-use tch::{Device, Tensor};
-use tract_onnx::prelude::*;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use image::{DynamicImage, ImageBuffer};
-use anyhow::Result;
+use wasm_bindgen::prelude::*;
+use serde::{Serialize, Deserialize};
+use js_sys::Date;
 
-pub struct EmotionDetector {
-    model: SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>,
-    device: Device,
-    frame_buffer: Arc<Mutex<Vec<u8>>>,
-}
-
-#[derive(Debug, Clone)]
+#[wasm_bindgen]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionState {
+    #[wasm_bindgen(skip)]
     pub dominant_emotion: String,
     pub intensity: f32,
     pub confidence: f32,
-    pub timestamp: i64,
+    pub timestamp: f64,
 }
 
-impl EmotionDetector {
-    pub async fn new() -> Result<Self> {
-        // Load ONNX model for emotion detection
-        let model = tract_onnx::onnx()
-            .model_for_path("models/emotion_detector.onnx")?
-            .into_optimized()?
-            .into_runnable()?;
-
-        Ok(Self {
-            model,
-            device: Device::Cpu,
-            frame_buffer: Arc::new(Mutex::new(Vec::new())),
-        })
+#[wasm_bindgen]
+impl EmotionState {
+    #[wasm_bindgen(getter)]
+    pub fn dominant_emotion(&self) -> String {
+        self.dominant_emotion.clone()
     }
 
-    pub async fn process_frame(&self, frame: &[u8], width: u32, height: u32) -> Result<EmotionState> {
-        // Convert frame to tensor
-        let tensor = self.preprocess_frame(frame, width, height)?;
-        
-        // Run inference
-        let output = self.model.run(tvec!(tensor))?;
-        let emotions = self.postprocess_output(output)?;
-
-        Ok(emotions)
-    }
-
-    fn preprocess_frame(&self, frame: &[u8], width: u32, height: u32) -> Result<Tensor> {
-        // Convert frame to image
-        let img = ImageBuffer::from_raw(width, height, frame.to_vec())
-            .ok_or_else(|| anyhow::anyhow!("Failed to create image buffer"))?;
-        
-        // Resize to model input size
-        let resized = image::imageops::resize(&img, 48, 48, image::imageops::FilterType::Triangle);
-        
-        // Convert to tensor and normalize
-        let tensor = Tensor::of_slice(&resized.into_raw())
-            .view([1, 1, 48, 48])
-            .to_kind(tch::Kind::Float)
-            .to_device(self.device);
-        
-        Ok(tensor)
-    }
-
-    fn postprocess_output(&self, output: TVec<TValue>) -> Result<EmotionState> {
-        let emotions = output[0].to_array_view::<f32>()?;
-        
-        // Get dominant emotion and confidence
-        let (max_idx, max_val) = emotions
-            .iter()
-            .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .unwrap();
-
-        let emotion = match max_idx {
-            0 => "neutral",
-            1 => "happy",
-            2 => "sad",
-            3 => "angry",
-            4 => "fearful",
-            5 => "disgusted",
-            6 => "surprised",
-            _ => "unknown",
-        };
-
-        Ok(EmotionState {
-            dominant_emotion: emotion.to_string(),
-            intensity: *max_val,
-            confidence: self.calculate_confidence(&emotions),
-            timestamp: chrono::Utc::now().timestamp_millis(),
-        })
-    }
-
-    fn calculate_confidence(&self, emotions: &ndarray::ArrayView1<f32>) -> f32 {
-        let sum: f32 = emotions.iter().sum();
-        let max = emotions.iter().fold(0.0, |a, &b| a.max(b));
-        max / sum
+    #[wasm_bindgen(setter)]
+    pub fn set_dominant_emotion(&mut self, value: String) {
+        self.dominant_emotion = value;
     }
 }
 
-// Integration with distributed LLM
-pub struct EmotionLLM {
-    llm_client: Arc<Mutex<LLMClient>>,
+#[wasm_bindgen]
+pub struct WasmEmotionDetector {
+    frame_buffer: Vec<u8>,
 }
 
-impl EmotionLLM {
-    pub fn new(llm_endpoint: &str) -> Self {
+#[wasm_bindgen]
+impl WasmEmotionDetector {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
         Self {
-            llm_client: Arc::new(Mutex::new(LLMClient::new(llm_endpoint))),
+            frame_buffer: Vec::new(),
         }
     }
 
-    pub async fn analyze_emotion_context(&self, emotion_state: &EmotionState) -> Result<String> {
-        let prompt = format!(
-            "Analyze the following emotional state and provide context-aware feedback: \
-             Emotion: {}, Intensity: {:.2}, Confidence: {:.2}",
-            emotion_state.dominant_emotion,
-            emotion_state.intensity,
-            emotion_state.confidence
-        );
+    #[wasm_bindgen]
+    pub fn process_frame(&mut self, frame: &[u8], width: u32, height: u32) -> Result<EmotionState, JsValue> {
+        // Store frame data
+        self.frame_buffer = frame.to_vec();
 
-        let response = self.llm_client.lock().await.generate(&prompt).await?;
-        Ok(response)
+        // Mock emotion detection for now
+        // TODO: Implement actual emotion detection using WASM-compatible ML
+        Ok(EmotionState {
+            dominant_emotion: "happy".to_string(),
+            intensity: 0.8,
+            confidence: 0.9,
+            timestamp: Date::now(),
+        })
     }
 }
 
-// Mock LLM client for demonstration
-struct LLMClient {
+#[wasm_bindgen]
+pub struct WasmEmotionLLM {
     endpoint: String,
 }
 
-impl LLMClient {
-    fn new(endpoint: &str) -> Self {
-        Self {
-            endpoint: endpoint.to_string(),
-        }
+#[wasm_bindgen]
+impl WasmEmotionLLM {
+    #[wasm_bindgen(constructor)]
+    pub fn new(endpoint: String) -> Self {
+        Self { endpoint }
     }
 
-    async fn generate(&self, prompt: &str) -> Result<String> {
-        // Implement actual LLM client logic here
-        Ok("Emotional analysis response".to_string())
+    #[wasm_bindgen]
+    pub fn analyze_emotion(&self, emotion_state: EmotionState) -> Result<String, JsValue> {
+        // Mock LLM analysis for now
+        // TODO: Implement actual LLM integration
+        Ok(format!(
+            "Analysis of {} emotion with intensity {:.2} and confidence {:.2}",
+            emotion_state.dominant_emotion,
+            emotion_state.intensity,
+            emotion_state.confidence
+        ))
     }
 } 
