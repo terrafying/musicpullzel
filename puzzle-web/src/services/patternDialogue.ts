@@ -1,5 +1,14 @@
 import { PatternSynthService } from './patternSynth';
-import { EmergentPattern } from './types';
+
+interface EmergentPattern {
+  strength: number;
+  type: 'harmonic' | 'rhythmic' | 'emergent';
+  patternType: string;
+  resonanceField: {
+    center: { x: number; y: number; z: number };
+    radius: number;
+  };
+}
 
 interface DialogueState {
   userInfluence: number;
@@ -9,29 +18,47 @@ interface DialogueState {
   patternHistory: EmergentPattern[];
 }
 
+interface CyberneticFeedback {
+  homeostasis: number;
+  adaptation: number;
+  emergence: number;
+  stability: number;
+}
+
 export class PatternDialogueService {
   private patternSynth: PatternSynthService;
   private dialogueStates: Map<number, DialogueState> = new Map();
   private evolutionInterval: number | null = null;
   private context: AudioContext;
   
-  // Routing matrices for different pattern types
+  // Enhanced routing matrices with cybernetic feedback loops
   private routingMatrices = {
     harmonic: [
-      [0.8, 0.2, 0.0], // User influence
-      [0.2, 0.6, 0.2], // System influence
-      [0.0, 0.2, 0.8]  // Evolution rate
+      [0.8, 0.2, 0.0, 0.1], // User influence
+      [0.2, 0.6, 0.2, 0.1], // System influence
+      [0.0, 0.2, 0.8, 0.1], // Evolution rate
+      [0.1, 0.1, 0.1, 0.7]  // Feedback loop
     ],
     rhythmic: [
-      [0.6, 0.3, 0.1],
-      [0.3, 0.5, 0.2],
-      [0.1, 0.2, 0.7]
+      [0.6, 0.3, 0.1, 0.2],
+      [0.3, 0.5, 0.2, 0.1],
+      [0.1, 0.2, 0.7, 0.1],
+      [0.2, 0.1, 0.1, 0.6]
     ],
     emergent: [
-      [0.4, 0.4, 0.2],
-      [0.4, 0.4, 0.2],
-      [0.2, 0.2, 0.6]
+      [0.4, 0.4, 0.2, 0.3],
+      [0.4, 0.4, 0.2, 0.2],
+      [0.2, 0.2, 0.6, 0.2],
+      [0.3, 0.2, 0.2, 0.5]
     ]
+  };
+
+  // Add cybernetic state tracking
+  private cyberneticState = {
+    homeostasis: 0.5,
+    adaptation: 0.3,
+    emergence: 0.2,
+    stability: 0.7
   };
 
   constructor(patternSynth: PatternSynthService) {
@@ -110,19 +137,133 @@ export class PatternDialogueService {
     }, 100); // Update every 100ms
   }
 
-  // Evolve pattern based on current state
+  // Enhanced evolution with cybernetic principles
   private evolvePattern(noteIndex: number, state: DialogueState) {
     const timeSinceLastInteraction = Date.now() - state.lastInteraction;
     
-    // Gradually shift influence back to system
-    if (timeSinceLastInteraction > 2000) {
-      state.userInfluence = Math.max(0.2, state.userInfluence - 0.01);
-      state.systemInfluence = Math.min(0.8, state.systemInfluence + 0.01);
-    }
-
-    // Evolve pattern based on history and current state
+    // Calculate cybernetic feedback
+    const feedback = this.calculateCyberneticFeedback(state);
+    
+    // Update cybernetic state
+    this.updateCyberneticState(feedback);
+    
+    // Apply cybernetic principles to pattern evolution
     const evolution = this.calculateEvolution(state);
+    evolution.strength *= this.cyberneticState.adaptation;
+    evolution.type = this.determineEmergentType();
+    
+    // Apply homeostasis to maintain stability
+    if (this.cyberneticState.stability < 0.3) {
+      evolution.strength *= 0.5;
+    }
+    
     this.patternSynth.evolvePattern(noteIndex, evolution);
+  }
+
+  private calculateCyberneticFeedback(state: DialogueState): CyberneticFeedback {
+    const recentPatterns = state.patternHistory.slice(-5);
+    const feedback = {
+      homeostasis: 0,
+      adaptation: 0,
+      emergence: 0,
+      stability: 0
+    };
+
+    // Calculate homeostasis based on pattern consistency
+    feedback.homeostasis = this.calculateHomeostasis(recentPatterns);
+    
+    // Calculate adaptation based on pattern changes
+    feedback.adaptation = this.calculateAdaptation(recentPatterns);
+    
+    // Calculate emergence based on unexpected patterns
+    feedback.emergence = this.calculateEmergence(recentPatterns);
+    
+    // Calculate stability based on overall system state
+    feedback.stability = this.calculateStability(recentPatterns);
+
+    return feedback;
+  }
+
+  private updateCyberneticState(feedback: CyberneticFeedback) {
+    const learningRate = 0.1;
+    
+    this.cyberneticState.homeostasis = 
+      this.cyberneticState.homeostasis * (1 - learningRate) + 
+      feedback.homeostasis * learningRate;
+      
+    this.cyberneticState.adaptation = 
+      this.cyberneticState.adaptation * (1 - learningRate) + 
+      feedback.adaptation * learningRate;
+      
+    this.cyberneticState.emergence = 
+      this.cyberneticState.emergence * (1 - learningRate) + 
+      feedback.emergence * learningRate;
+      
+    this.cyberneticState.stability = 
+      this.cyberneticState.stability * (1 - learningRate) + 
+      feedback.stability * learningRate;
+  }
+
+  private calculateHomeostasis(patterns: EmergentPattern[]) {
+    if (patterns.length < 2) return 0.5;
+    
+    const variations = patterns.slice(1).map((p, i) => 
+      Math.abs(p.strength - patterns[i].strength)
+    );
+    
+    return 1 - (variations.reduce((a, b) => a + b, 0) / variations.length);
+  }
+
+  private calculateAdaptation(patterns: EmergentPattern[]) {
+    if (patterns.length < 2) return 0.3;
+    
+    const adaptations = patterns.slice(1).map((p, i) => 
+      p.type !== patterns[i].type ? 1 : 0
+    );
+    
+    return adaptations.reduce((sum: number, val: number) => sum + val, 0) / adaptations.length;
+  }
+
+  private calculateEmergence(patterns: EmergentPattern[]) {
+    if (patterns.length < 3) return 0.2;
+    
+    const unexpectedPatterns = patterns.filter((p, i) => 
+      i > 0 && p.strength > patterns[i-1].strength * 1.5
+    );
+    
+    return unexpectedPatterns.length / patterns.length;
+  }
+
+  private calculateStability(patterns: EmergentPattern[]) {
+    const homeostasis = this.calculateHomeostasis(patterns);
+    const adaptation = this.calculateAdaptation(patterns);
+    const emergence = this.calculateEmergence(patterns);
+    
+    return (homeostasis * 0.4 + adaptation * 0.3 + emergence * 0.3);
+  }
+
+  private determineEmergentType(): string {
+    const types = ['harmonic', 'rhythmic', 'emergent'];
+    const weights = [
+      this.cyberneticState.homeostasis,
+      this.cyberneticState.adaptation,
+      this.cyberneticState.emergence
+    ];
+    
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    const normalizedWeights = weights.map(w => w / totalWeight);
+    
+    const random = Math.random();
+    let cumulativeWeight = 0;
+    
+    for (let i = 0; i < types.length; i++) {
+      cumulativeWeight += normalizedWeights[i];
+      if (random <= cumulativeWeight) {
+        return types[i];
+      }
+    }
+    
+    return types[types.length - 1];
   }
 
   // Calculate pattern evolution based on history
