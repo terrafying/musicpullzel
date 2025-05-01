@@ -1,7 +1,7 @@
 import { EmotionFeedback } from './emotionService';
 import { EmergentPattern } from './patternDialogue';
 
-interface GestaltObject {
+export interface GestaltObject {
   color: {
     hue: number;
     saturation: number;
@@ -55,6 +55,36 @@ export class GestaltMapper {
   private cache: Map<string, GestaltCache> = new Map();
   private lastCacheCleanup = Date.now();
   
+  private readonly EMOTION_COLORS: Record<string, { hue: number; saturation: number; brightness: number }> = {
+    neutral: { hue: 0, saturation: 0, brightness: 50 },
+    happy: { hue: 60, saturation: 100, brightness: 50 },
+    sad: { hue: 240, saturation: 100, brightness: 50 },
+    angry: { hue: 0, saturation: 100, brightness: 50 },
+    fearful: { hue: 280, saturation: 100, brightness: 50 },
+    disgusted: { hue: 120, saturation: 100, brightness: 50 },
+    surprised: { hue: 30, saturation: 100, brightness: 50 }
+  };
+
+  private readonly EMOTION_SHAPES: Record<string, 'circle' | 'square' | 'triangle' | 'wave' | 'spiral'> = {
+    neutral: 'circle',
+    happy: 'spiral',
+    sad: 'wave',
+    angry: 'triangle',
+    fearful: 'spiral',
+    disgusted: 'square',
+    surprised: 'circle'
+  };
+
+  private readonly EMOTION_MOTION: Record<string, { type: 'oscillate' | 'pulse' | 'spiral' | 'wave' | 'chaos'; speed: number; amplitude: number }> = {
+    neutral: { type: 'oscillate', speed: 1, amplitude: 10 },
+    happy: { type: 'spiral', speed: 2, amplitude: 20 },
+    sad: { type: 'wave', speed: 0.5, amplitude: 15 },
+    angry: { type: 'chaos', speed: 3, amplitude: 25 },
+    fearful: { type: 'pulse', speed: 2.5, amplitude: 30 },
+    disgusted: { type: 'wave', speed: 1.5, amplitude: 15 },
+    surprised: { type: 'oscillate', speed: 2, amplitude: 20 }
+  };
+
   constructor(audioContext: AudioContext) {
     this.context = audioContext;
     this.mappings = this.initializeMappings();
@@ -610,6 +640,41 @@ export class GestaltMapper {
     return {
       size: this.cache.size,
       hitRate: this.cache.size / this.MAX_CACHE_SIZE
+    };
+  }
+
+  public mapEmotionToGestalt(emotionalState: any): GestaltObject {
+    const { currentEmotion, emotionalStability, engagement, resonance } = emotionalState;
+    const color = this.EMOTION_COLORS[currentEmotion] || this.EMOTION_COLORS.neutral;
+    const shape = this.EMOTION_SHAPES[currentEmotion] || this.EMOTION_SHAPES.neutral;
+    const motion = this.EMOTION_MOTION[currentEmotion] || this.EMOTION_MOTION.neutral;
+
+    return {
+      color: {
+        ...color,
+        alpha: 0.7 + emotionalStability * 0.3
+      },
+      shape: {
+        type: shape,
+        size: 50 + engagement * 30,
+        rotation: 0,
+        complexity: 1 + emotionalStability * 2
+      },
+      audio: {
+        frequency: 440 + engagement * 440,
+        waveform: 'sine',
+        modulation: emotionalStability,
+        resonance: resonance
+      },
+      motion: {
+        ...motion,
+        phase: 0
+      },
+      resonance: {
+        emotional: emotionalStability,
+        musical: engagement,
+        gestalt: resonance
+      }
     };
   }
 } 

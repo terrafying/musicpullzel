@@ -273,6 +273,7 @@ export class EmotionService {
       coherence: number;
     };
     resonance: number;
+    timestamp: number;
   } {
     if (this.emotionHistory.length === 0) {
       return {
@@ -280,7 +281,8 @@ export class EmotionService {
         emotionalStability: 0,
         engagement: 0,
         homeostasis: this.emotionalHomeostasis,
-        resonance: this.emotionalResonance.current
+        resonance: this.emotionalResonance.current,
+        timestamp: Date.now()
       };
     }
 
@@ -302,7 +304,8 @@ export class EmotionService {
       emotionalStability: stability,
       engagement,
       homeostasis: this.emotionalHomeostasis,
-      resonance: this.emotionalResonance.current
+      resonance: this.emotionalResonance.current,
+      timestamp: Date.now()
     };
   }
 

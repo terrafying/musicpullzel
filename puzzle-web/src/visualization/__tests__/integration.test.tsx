@@ -1,8 +1,5 @@
-import React from 'react';
 import { render, screen, act } from '@testing-library/react';
 import PatternVisualizer from '../components/PatternVisualizer';
-import { useCanvasRenderer } from '../hooks/useCanvasRenderer';
-import { CanvasRenderer } from '../core/CanvasRenderer';
 import { createMockPattern, createMockCanvas, createMockNoteElements, cleanupMockNoteElements } from '../../test/utils';
 
 describe('Visualization Integration', () => {

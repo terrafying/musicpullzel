@@ -20,9 +20,14 @@ import { MonsterService } from './services/monsterService'
 import { MonsterRenderer } from './components/MonsterRenderer'
 import { ProgressVisualizer } from './components/ProgressVisualizer'
 import { EmotionService } from './services/emotionService'
-import { EmotionFeedback } from './components/EmotionFeedback'
+import { EmotionFeedbackDisplay } from './components/EmotionFeedbackDisplay'
 import { RustEmotionService } from './services/rustEmotionService'
+import { ExoCursorAddon } from './components/ExoCursorAddon'
+import { SpaceMapVisualizer } from './components/SpaceMapVisualizer'
+import { SpaceMapService } from './services/spaceMapService'
 import './App.css'
+import { NoteState, SpatialPosition } from './services/audio/types'
+import HelixVisualizer from './components/HelixVisualizer'
 
 // Type definitions
 type NoteVisual = {
@@ -104,18 +109,51 @@ const SACRED_PATTERNS = {
   }
 } as const;
 
+// Core game state interface
+interface GameState {
+  // Audio state
+  audio: {
+    isInitialized: boolean;
+    volume: number;
+    tempo: number;
+    activeNotes: Map<number, NoteState>;
+  };
+  
+  // Pattern state
+  pattern: {
+    resonance: number;
+    resonatingPairs: [number, number, number][];
+    pathways: Array<{
+      notes: number[];
+      strength: number;
+      type: 'harmonic' | 'subharmonic' | 'overtone' | 'interference';
+    }>;
+  };
+  
+  // Visual state
+  visual: {
+    isDarkMode: boolean;
+    canvasSize: { width: number; height: number };
+  };
+  
+  // Game mode
+  mode: {
+    isDebug: boolean;
+    isPlaying: boolean;
+  };
+}
+
 function App() {
   const [audioService] = useState(() => new AudioService());
   const [puzzleService] = useState(() => new PuzzleService());
   const [connectomeService] = useState(() => new ConnectomeService());
   const [sharedStateService] = useState(() => new SharedStateService());
-  const [activeNotes, setActiveNotes] = useState<number[]>([]);
   const [resonancePattern, setResonancePattern] = useState<ResonancePattern | null>(null);
   const [debugMode, setDebugMode] = useState(false);
   const [volume, setVolume] = useState(0.5);
   const [isAudioInitialized, setIsAudioInitialized] = useState(false);
   const [tempo] = useState(120);
-  const logger = Logger.getInstance();
+  const logger = Logger.create('App');
   const [totalResonance, setTotalResonance] = useState(0);
   const [resonatingPairs, setResonatingPairs] = useState<[number, number, number][]>([]);
   const [pathways, setPathways] = useState<Array<{
@@ -162,36 +200,88 @@ function App() {
     stability: 0,
     engagement: 0
   });
+  const [spaceMapService] = useState(() => SpaceMapService.getInstance());
+  const [showSpaceMap, setShowSpaceMap] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [helixConfig, setHelixConfig] = useState({
+    timeSpread: 3,
+    rotationSpeed: 0.5,
+    isVisible: false
+  });
+
+  // Consolidated game state
+  const [gameState, setGameState] = useState<GameState>({
+    audio: {
+      isInitialized: false,
+      volume: 0.5,
+      tempo: 120,
+      activeNotes: new Map()
+    },
+    pattern: {
+      resonance: 0,
+      resonatingPairs: [],
+      pathways: []
+    },
+    visual: {
+      isDarkMode: false,
+      canvasSize: { width: window.innerWidth, height: window.innerHeight }
+    },
+    mode: {
+      isDebug: false,
+      isPlaying: false
+    }
+  });
 
   useEffect(() => {
     const initializeAudio = async () => {
       try {
         await audioService.initialize();
-        setIsAudioInitialized(true);
+        setGameState(prev => ({
+          ...prev,
+          audio: { ...prev.audio, isInitialized: true }
+        }));
+        
+        // Start with some initial notes
+        audioService.playNote(440, 'sine', true); // A4
+        audioService.playNote(554.37, 'sine', true); // C#5
+        audioService.playNote(659.25, 'sine', true); // E5
+        
         logger.info('App', 'Audio initialized successfully');
       } catch (error) {
-        logger.error('App', 'Failed to initialize audio', { error });
+        logger.error('App', 'Failed to initialize audio', { error: String(error) });
       }
     };
 
     initializeAudio();
-    updateGameState();
+
+    // Update active notes periodically
+    const interval = setInterval(() => {
+      const notes = audioService.getActiveNotes();
+      if (notes) {
+        setGameState(prev => ({
+          ...prev,
+          audio: { ...prev.audio, activeNotes: notes }
+        }));
+      }
+    }, 100);
 
     return () => {
+      clearInterval(interval);
       audioService.cleanup();
     };
-  }, [audioService]);
+  }, [audioService, logger]);
 
   const updateGameState = () => {
     const pattern = puzzleService.toggleNote(0);
-    setActiveNotes(pattern.activeNotes);
-    setResonatingPairs(pattern.resonatingPairs);
-    setSemanticState({
-      harmonic: pattern.harmonicState,
-      rhythmic: pattern.rhythmicState,
-      types: pattern.resonanceTypes
-    });
-    setPathways(pattern.pathways);
+    setGameState(prev => ({
+      ...prev,
+      pattern: {
+        ...prev.pattern,
+        resonance: pattern.resonance,
+        resonatingPairs: pattern.resonatingPairs,
+        pathways: pattern.pathways
+      }
+    }));
     setPatterns(prevPatterns => [...prevPatterns, pattern]);
   };
 
@@ -214,7 +304,7 @@ function App() {
   useEffect(() => {
     const { resonanceSum } = calculateResonatingPairs();
     setTotalResonance(resonanceSum);
-  }, [activeNotes]);
+  }, [gameState.pattern.resonatingPairs]);
 
   // Update spinor animation frames
   useEffect(() => {
@@ -222,14 +312,14 @@ function App() {
     const updateSpinors = () => {
       setSpinorStates(prevStates => {
         const newStates = new Map(prevStates);
-        activeNotes.forEach(noteIndex => {
-          const state = newStates.get(noteIndex);
+        gameState.audio.activeNotes.forEach((note, index) => {
+          const state = newStates.get(index);
           if (state) {
             const elapsed = (Date.now() - state.startTime) / 1000;
             const rotation = (elapsed * state.rate * 360 + state.phase * 180 / Math.PI) % 360;
-            const note = document.querySelector(`[data-note-index="${noteIndex}"]`);
-            if (note) {
-              note.setAttribute('style', `${note.getAttribute('style')}; transform: translate(-50%, -50%) rotate(${rotation}deg)`);
+            const noteElement = document.querySelector(`[data-note-index="${index}"]`);
+            if (noteElement) {
+              noteElement.setAttribute('style', `${noteElement.getAttribute('style')}; transform: translate(-50%, -50%) rotate(${rotation}deg)`);
             }
           }
         });
@@ -240,16 +330,15 @@ function App() {
     
     animationFrame = requestAnimationFrame(updateSpinors);
     return () => cancelAnimationFrame(animationFrame);
-  }, [activeNotes, spinorStates]);
+  }, [gameState.audio.activeNotes, spinorStates]);
 
   // Update delay visualization
   useEffect(() => {
     const updateEchoes = () => {
       setDelayEchoes(prevEchoes => {
         const newEchoes = new Map(prevEchoes);
-        activeNotes.forEach(noteIndex => {
-          const note = noteVisuals[noteIndex];
-          const pattern = Object.values(SACRED_PATTERNS)[noteIndex % Object.keys(SACRED_PATTERNS).length];
+        gameState.audio.activeNotes.forEach((note, index) => {
+          const pattern = Object.values(SACRED_PATTERNS)[index % Object.keys(SACRED_PATTERNS).length];
           const positions = [];
           
           // Generate sacred geometry echo positions
@@ -262,7 +351,7 @@ function App() {
             });
           }
           
-          newEchoes.set(noteIndex, {
+          newEchoes.set(index, {
             positions,
             opacity: 0.7
           });
@@ -273,15 +362,18 @@ function App() {
 
     const interval = setInterval(updateEchoes, 60 / tempo * 750); // 3/4 of beat duration
     return () => clearInterval(interval);
-  }, [activeNotes, tempo]);
+  }, [gameState.audio.activeNotes, tempo]);
 
   // Add resize handler
   useEffect(() => {
     const handleResize = () => {
-      setCanvasSize({
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
+      setGameState(prev => ({
+        ...prev,
+        visual: {
+          ...prev.visual,
+          canvasSize: { width: window.innerWidth, height: window.innerHeight }
+        }
+      }));
     };
 
     window.addEventListener('resize', handleResize);
@@ -294,11 +386,14 @@ function App() {
   };
 
   const toggleNote = async (note: number) => {
-    const newActiveNotes = activeNotes.includes(note)
-      ? activeNotes.filter(n => n !== note)
-      : [...activeNotes, note];
+    const newActiveNotes = gameState.audio.activeNotes.includes(note)
+      ? gameState.audio.activeNotes.filter(n => n !== note)
+      : [...gameState.audio.activeNotes, note];
     
-    setActiveNotes(newActiveNotes);
+    setGameState(prev => ({
+      ...prev,
+      audio: { ...prev.audio, activeNotes: newActiveNotes }
+    }));
     
     if (newActiveNotes.length > 0) {
       const guess = parseInt(newActiveNotes.join(''), 2);
@@ -321,7 +416,10 @@ function App() {
 
   const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(event.target.value);
-    setVolume(newVolume);
+    setGameState(prev => ({
+      ...prev,
+      audio: { ...prev.audio, volume: newVolume }
+    }));
     audioService.setVolume(newVolume);
   };
 
@@ -561,28 +659,102 @@ function App() {
     });
   }, [emotionalState, monsters, monsterService]);
 
+  const handleExoCompletion = (text: string) => {
+    logger.info('App', 'Received Exo completion', { text });
+    // TODO: Handle the completion text based on your requirements
+  };
+
+  // Add this effect to update SpaceMAP points when patterns change
+  useEffect(() => {
+    if (patterns.length > 0) {
+      spaceMapService.clearPoints();
+      patterns.forEach(pattern => {
+        spaceMapService.addPoint({
+          x: pattern.position.x,
+          y: pattern.position.y,
+          metadata: {
+            type: pattern.type,
+            strength: pattern.strength,
+            resonance: pattern.resonance
+          }
+        });
+      });
+    }
+  }, [patterns, spaceMapService]);
+
+  // Add this handler for SpaceMAP point clicks
+  const handleSpaceMapPointClick = (point: any) => {
+    logger.info('App', 'SpaceMAP point clicked', { point });
+    // You can add additional handling here, such as highlighting the corresponding pattern
+  };
+
+  const toggleDarkMode = () => {
+    setGameState(prev => ({
+      ...prev,
+      visual: { ...prev.visual, isDarkMode: !prev.visual.isDarkMode }
+    }));
+    audioService.setDarkMode(!gameState.visual.isDarkMode);
+  };
+
+  const toggleDebugMode = () => {
+    setGameState(prev => ({
+      ...prev,
+      mode: { ...prev.mode, isDebug: !prev.mode.isDebug }
+    }));
+  };
+
+  // Handle helix time spread change
+  const handleTimeSpreadChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newTimeSpread = parseFloat(event.target.value);
+    setHelixConfig(prev => ({
+      ...prev,
+      timeSpread: newTimeSpread
+    }));
+  };
+
+  // Handle helix rotation speed change
+  const handleRotationSpeedChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newSpeed = parseFloat(event.target.value);
+    setHelixConfig(prev => ({
+      ...prev,
+      rotationSpeed: newSpeed
+    }));
+  };
+
+  // Toggle helix visibility
+  const toggleHelixVisibility = () => {
+    setHelixConfig(prev => ({
+      ...prev,
+      isVisible: !prev.isVisible
+    }));
+  };
+
   return (
-    <div className="app-container">
+    <div className="app-container" style={{
+      backgroundColor: gameState.visual.isDarkMode ? '#1a1a1a' : '#ffffff',
+      color: gameState.visual.isDarkMode ? '#ffffff' : '#1a1a1a',
+      transition: 'background-color 0.3s, color 0.3s'
+    }}>
       <h1 className="title">Music Puzzle Game</h1>
       
-      <div className="game-board" style={{ width: canvasSize.width, height: canvasSize.height }}>
+      <div className="game-board" style={{ width: gameState.visual.canvasSize.width, height: gameState.visual.canvasSize.height }}>
         <ProgressVisualizer
           monsters={monsters}
           totalPatterns={totalPatterns}
           defeatedPatterns={defeatedPatterns}
           learningEfficiency={learningEfficiency}
-          canvasSize={canvasSize}
+          canvasSize={gameState.visual.canvasSize}
         />
         
         <MonsterRenderer
           monsters={monsters}
-          canvasSize={canvasSize}
+          canvasSize={gameState.visual.canvasSize}
           onMonsterClick={(monsterId) => setSelectedMonster(monsterId)}
         />
         
         <InteractiveCanvas
           patterns={patterns}
-          canvasSize={canvasSize}
+          canvasSize={gameState.visual.canvasSize}
           onConnectionDrawn={handleConnectionDrawn}
           onShapeMoved={handleShapeMoved}
         />
@@ -598,27 +770,27 @@ function App() {
           <>
             <PatternExplorer
               connectomeService={connectomeService}
-              canvasSize={canvasSize}
+              canvasSize={gameState.visual.canvasSize}
               sharedStateService={sharedStateService}
             />
             
             <PatternVisualizer
               patterns={connectomeService.getActivePatterns()}
-              canvasSize={canvasSize}
+              canvasSize={gameState.visual.canvasSize}
               imaginaryField={connectomeService.getImaginaryField()}
             />
             
             <AnalogicalVisualizer
               patterns={connectomeService.getActivePatterns()}
               mappings={connectomeService.getAnalogicalMappings()}
-              canvasSize={canvasSize}
+              canvasSize={gameState.visual.canvasSize}
               imaginaryField={connectomeService.getImaginaryField()}
               patternHistory={connectomeService.getPatternHistory()}
             />
             
             <ConnectionLines 
-              activeNotes={activeNotes}
-              resonatingPairs={resonatingPairs}
+              activeNotes={gameState.audio.activeNotes}
+              resonatingPairs={calculatedPairs}
               pathways={pathways}
               noteVisuals={noteVisuals}
               connectomeService={connectomeService}
@@ -651,7 +823,7 @@ function App() {
             {/* Existing note buttons with sacred geometry patterns */}
             {noteVisuals.map((note, index) => {
               const spinorState = spinorStates.get(index);
-              const isActive = activeNotes.includes(index);
+              const isActive = gameState.audio.activeNotes.includes(index);
               const pattern = Object.values(SACRED_PATTERNS)[index % Object.keys(SACRED_PATTERNS).length];
               
               return (
@@ -748,6 +920,17 @@ function App() {
             </button>
           </div>
         )}
+
+        {helixConfig.isVisible && (
+          <div className="helix-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2 }}>
+            <HelixVisualizer
+              activeNotes={gameState.audio.activeNotes}
+              isDarkMode={gameState.visual.isDarkMode}
+              timeSpread={helixConfig.timeSpread}
+              rotationSpeed={helixConfig.rotationSpeed}
+            />
+          </div>
+        )}
       </div>
 
       <div className="visualizer-container">
@@ -765,7 +948,7 @@ function App() {
             min="0"
             max="1"
             step="0.01"
-            value={volume}
+            value={gameState.audio.volume}
             onChange={handleVolumeChange}
           />
         </div>
@@ -817,23 +1000,145 @@ function App() {
             </button>
           </div>
         </div>
+
+        <div className="space-map-control">
+          <button
+            onClick={() => setShowSpaceMap(!showSpaceMap)}
+            className={showSpaceMap ? 'active' : ''}
+          >
+            {showSpaceMap ? 'Hide SpaceMAP' : 'Show SpaceMAP'}
+          </button>
+        </div>
+
+        <div className="helix-controls" style={{ 
+          marginTop: '20px',
+          padding: '15px',
+          borderRadius: '8px',
+          backgroundColor: gameState.visual.isDarkMode ? '#2a2a2a' : '#f0f0f0'
+        }}>
+          <h3 style={{ margin: '0 0 10px 0' }}>Helix Visualization</h3>
+          
+          <button
+            onClick={toggleHelixVisibility}
+            style={{
+              padding: '8px 16px',
+              fontSize: '14px',
+              backgroundColor: helixConfig.isVisible ? '#4CAF50' : '#666',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              marginBottom: '10px'
+            }}
+            aria-pressed={helixConfig.isVisible}
+          >
+            {helixConfig.isVisible ? 'Hide Helix' : 'Show Helix'}
+          </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div>
+              <label 
+                htmlFor="timeSpread"
+                style={{ display: 'block', marginBottom: '5px' }}
+              >
+                Time Spread: {helixConfig.timeSpread.toFixed(1)}s
+              </label>
+              <input
+                id="timeSpread"
+                type="range"
+                min="1"
+                max="10"
+                step="0.1"
+                value={helixConfig.timeSpread}
+                onChange={handleTimeSpreadChange}
+                style={{ width: '100%' }}
+                aria-label="Time spread in seconds"
+                aria-valuemin={1}
+                aria-valuemax={10}
+                aria-valuenow={helixConfig.timeSpread}
+              />
+            </div>
+
+            <div>
+              <label 
+                htmlFor="rotationSpeed"
+                style={{ display: 'block', marginBottom: '5px' }}
+              >
+                Rotation Speed: {helixConfig.rotationSpeed.toFixed(2)}
+              </label>
+              <input
+                id="rotationSpeed"
+                type="range"
+                min="0.1"
+                max="2"
+                step="0.1"
+                value={helixConfig.rotationSpeed}
+                onChange={handleRotationSpeedChange}
+                style={{ width: '100%' }}
+                aria-label="Rotation speed"
+                aria-valuemin={0.1}
+                aria-valuemax={2}
+                aria-valuenow={helixConfig.rotationSpeed}
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <SpatialControls audioService={audioService} />
 
-      {debugMode && <DebugPanel />}
+      {gameState.mode.isDebug && <DebugPanel />}
 
-      <button 
-        className="debug-toggle"
-        onClick={() => setDebugMode(!debugMode)}
+      <button
+        onClick={toggleDebugMode}
+        style={{
+          padding: '10px 20px',
+          fontSize: '16px',
+          backgroundColor: gameState.mode.isDebug ? '#ff4444' : '#444444',
+          color: '#ffffff',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          marginLeft: '10px'
+        }}
       >
-        {debugMode ? 'Hide Debug' : 'Show Debug'}
+        {gameState.mode.isDebug ? 'Debug Mode On' : 'Debug Mode Off'}
       </button>
 
-      <EmotionFeedback
+      <EmotionFeedbackDisplay
         emotionService={emotionService}
         onEmotionalStateChange={setEmotionalState}
       />
+
+      <div className="exo-integration">
+        <ExoCursorAddon onCompletion={handleExoCompletion} />
+      </div>
+
+      {showSpaceMap && (
+        <div className="space-map-container">
+          <SpaceMapVisualizer
+            width={800}
+            height={600}
+            onPointClick={handleSpaceMapPointClick}
+          />
+        </div>
+      )}
+
+      <button
+        onClick={toggleDarkMode}
+        style={{
+          padding: '10px 20px',
+          fontSize: '16px',
+          backgroundColor: gameState.visual.isDarkMode ? '#ffffff' : '#1a1a1a',
+          color: gameState.visual.isDarkMode ? '#1a1a1a' : '#ffffff',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          transition: 'background-color 0.3s, color 0.3s'
+        }}
+      >
+        Toggle Dark Mode
+      </button>
     </div>
   );
 }

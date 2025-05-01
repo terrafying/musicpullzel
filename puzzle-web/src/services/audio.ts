@@ -1,4 +1,9 @@
 import { Logger } from './logger';
+import { PatternProcessor } from './patternProcessor';
+import { SpatialAudioProcessor } from './spatialAudio';
+import { DarkModeProcessor } from './darkModeProcessor';
+import { NoteManager } from './noteManager';
+import { NoteState } from './audio/types';
 
 interface ADSR {
   attack: number;   // Time to reach peak amplitude (seconds)
@@ -11,25 +16,6 @@ interface SpatialPosition {
   x: number;  // -1 to 1 (left to right)
   y: number;  // -1 to 1 (back to front)
   z: number;  // -1 to 1 (bottom to top)
-}
-
-interface NoteState {
-  oscillator: OscillatorNode;
-  gainNode: GainNode;
-  modOscillator: OscillatorNode;
-  modGain: GainNode;
-  rhythmOscillator?: OscillatorNode;
-  rhythmGain?: GainNode;
-  spinorOscillator?: OscillatorNode;
-  spinorGain?: GainNode;
-  panner?: PannerNode;
-  startTime: number;
-  isReleased: boolean;
-  waveform: OscillatorType;
-  isRhythmic: boolean;
-  delayNetwork?: DelayNetwork;
-  sacredRatio: number;
-  position: SpatialPosition;
 }
 
 interface ModulationParams {
@@ -81,22 +67,16 @@ interface AudioMode {
 }
 
 export class AudioService {
-  private audioContext: AudioContext | null = null;
+  private context: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private mainGainNode: GainNode | null = null;
   private limiter: DynamicsCompressorNode | null = null;
-  private darkFilter: BiquadFilterNode | null = null;
-  private darkReverb: ConvolverNode | null = null;
-  private mode: AudioMode = {
-    isNightMode: false,
-    filterCutoff: 2000,
-    reverbAmount: 0.3,
-    delayFeedback: 0.4
-  };
-  private delayNetworks: Map<number, DelayNetwork> = new Map();
+  private patternProcessor: PatternProcessor | null = null;
+  private spatialProcessor: SpatialAudioProcessor | null = null;
+  private darkModeProcessor: DarkModeProcessor | null = null;
+  private noteManager: NoteManager | null = null;
   private logger: Logger;
   private volume: number = 0.5;
-  private activeNotes: Map<number, NoteState> = new Map();
   private tempo: number = 120; // BPM
   private currentBeat: number = 0;
   private beatInterval: ReturnType<typeof setInterval> | null = null;
@@ -115,64 +95,39 @@ export class AudioService {
   };
 
   constructor() {
-    this.logger = Logger.getInstance();
+    this.logger = Logger.create('AudioService');
   }
 
   public async initialize(): Promise<void> {
     try {
-      this.audioContext = new AudioContext();
-      this.analyser = this.audioContext.createAnalyser();
-      this.mainGainNode = this.audioContext.createGain();
-      this.limiter = this.audioContext.createDynamicsCompressor();
-      this.darkFilter = this.audioContext.createBiquadFilter();
-      this.listener = this.audioContext.listener;
+      this.context = new AudioContext();
+      this.analyser = this.context.createAnalyser();
+      this.mainGainNode = this.context.createGain();
+      this.limiter = this.context.createDynamicsCompressor();
       
-      // Configure listener for spatial audio
-      this.listener.setOrientation(0, 0, -1, 0, 1, 0);
-      this.listener.setPosition(0, 0, 0);
+      // Initialize processors
+      this.patternProcessor = new PatternProcessor(this.context);
+      this.spatialProcessor = new SpatialAudioProcessor(this.context);
+      this.darkModeProcessor = new DarkModeProcessor(this.context);
+      this.noteManager = new NoteManager(this.context);
       
-      // Configure dark filter
-      this.darkFilter.type = 'lowpass';
-      this.darkFilter.frequency.setValueAtTime(this.mode.filterCutoff, this.audioContext.currentTime);
-      this.darkFilter.Q.setValueAtTime(0.7, this.audioContext.currentTime);
-
-      // Create dark reverb
-      this.darkReverb = this.audioContext.createConvolver();
-      await this.createDarkReverb();
-      
-      // Updated audio chain: mainGain -> darkFilter -> darkReverb -> limiter -> analyser -> destination
-      this.mainGainNode.connect(this.darkFilter);
-      this.darkFilter.connect(this.darkReverb);
-      this.darkReverb.connect(this.limiter);
+      // Connect audio chain
+      this.mainGainNode.connect(this.darkModeProcessor.getFilter());
+      this.darkModeProcessor.getFilter().connect(this.darkModeProcessor.getReverb());
+      this.darkModeProcessor.getReverb().connect(this.limiter);
       this.limiter.connect(this.analyser);
-      this.analyser.connect(this.audioContext.destination);
+      this.analyser.connect(this.context.destination);
+      
+      // Connect pattern processor
+      this.patternProcessor.getOutput().connect(this.mainGainNode);
       
       this.setVolume(this.volume);
       this.startBeatClock();
-      this.logger.info('AudioService', 'Audio context initialized with soft limiter');
+      this.logger.info('AudioService', 'Audio context initialized');
     } catch (error) {
       this.logger.error('AudioService', 'Failed to initialize audio context', { error });
       throw error;
     }
-  }
-
-  private async createDarkReverb(): Promise<void> {
-    if (!this.audioContext || !this.darkReverb) return;
-
-    // Create a dark, long reverb impulse response
-    const length = this.audioContext.sampleRate * 4.0; // 4 seconds
-    const impulse = this.audioContext.createBuffer(2, length, this.audioContext.sampleRate);
-    
-    for (let channel = 0; channel < impulse.numberOfChannels; channel++) {
-      const channelData = impulse.getChannelData(channel);
-      for (let i = 0; i < length; i++) {
-        // Exponential decay with some randomness for a dark character
-        const decay = Math.exp(-2.0 * i / length);
-        channelData[i] = (Math.random() * 2 - 1) * decay * 0.5;
-      }
-    }
-
-    this.darkReverb.buffer = impulse;
   }
 
   private startBeatClock(): void {
@@ -189,11 +144,12 @@ export class AudioService {
   }
 
   private updateRhythmicNotes(): void {
-    if (!this.audioContext) return;
+    if (!this.context || !this.noteManager) return;
 
-    this.activeNotes.forEach((note, frequency) => {
+    const activeNotes = this.noteManager.getActiveNotes();
+    activeNotes.forEach((note: NoteState, frequency: number) => {
       if (note.isRhythmic && note.rhythmGain) {
-        const now = this.audioContext!.currentTime;
+        const now = this.context!.currentTime;
         // Create a rhythmic pulse on each beat
         note.rhythmGain.gain.cancelScheduledValues(now);
         note.rhythmGain.gain.setValueAtTime(0.2, now);
@@ -212,22 +168,22 @@ export class AudioService {
   }
 
   private createDelayNetwork(frequency: number): DelayNetwork {
-    if (!this.audioContext) throw new Error('Audio context not initialized');
+    if (!this.context) throw new Error('Audio context not initialized');
 
     const network: DelayNetwork = {
-      delay: this.audioContext.createDelay(5.0),
-      feedback: this.audioContext.createGain(),
-      filter: this.audioContext.createBiquadFilter(),
-      mix: this.audioContext.createGain()
+      delay: this.context.createDelay(5.0),
+      feedback: this.context.createGain(),
+      filter: this.context.createBiquadFilter(),
+      mix: this.context.createGain()
     };
 
     // Set up delay network
-    network.delay.delayTime.setValueAtTime(60 / this.tempo * 0.75, this.audioContext.currentTime);
-    network.feedback.gain.setValueAtTime(0.4, this.audioContext.currentTime);
+    network.delay.delayTime.setValueAtTime(60 / this.tempo * 0.75, this.context.currentTime);
+    network.feedback.gain.setValueAtTime(0.4, this.context.currentTime);
     network.filter.type = 'lowpass';
-    network.filter.frequency.setValueAtTime(frequency * 0.5, this.audioContext.currentTime);
-    network.filter.Q.setValueAtTime(2, this.audioContext.currentTime);
-    network.mix.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+    network.filter.frequency.setValueAtTime(frequency * 0.5, this.context.currentTime);
+    network.filter.Q.setValueAtTime(2, this.context.currentTime);
+    network.mix.gain.setValueAtTime(0.3, this.context.currentTime);
 
     // Connect delay feedback loop
     network.delay.connect(network.filter);
@@ -235,21 +191,21 @@ export class AudioService {
     network.feedback.connect(network.delay);
     network.delay.connect(network.mix);
 
-    if (this.mode.isNightMode) {
+    if (this.darkModeProcessor?.mode.isNightMode) {
       // Longer delay times and higher feedback for dark mode
-      network.delay.delayTime.setValueAtTime(60 / this.tempo * 1.5, this.audioContext!.currentTime);
-      network.feedback.gain.setValueAtTime(this.mode.delayFeedback * 1.5, this.audioContext!.currentTime);
-      network.filter.frequency.setValueAtTime(frequency * 0.3, this.audioContext!.currentTime);
-      network.filter.Q.setValueAtTime(4, this.audioContext!.currentTime);
+      network.delay.delayTime.setValueAtTime(60 / this.tempo * 1.5, this.context!.currentTime);
+      network.feedback.gain.setValueAtTime(this.darkModeProcessor.mode.delayFeedback * 1.5, this.context!.currentTime);
+      network.filter.frequency.setValueAtTime(frequency * 0.3, this.context!.currentTime);
+      network.filter.Q.setValueAtTime(4, this.context!.currentTime);
     }
 
     return network;
   }
 
   private createPannerNode(): PannerNode {
-    if (!this.audioContext) throw new Error('Audio context not initialized');
+    if (!this.context) throw new Error('Audio context not initialized');
     
-    const panner = this.audioContext.createPanner();
+    const panner = this.context.createPanner();
     panner.panningModel = 'HRTF';
     panner.distanceModel = 'inverse';
     panner.refDistance = 1;
@@ -265,7 +221,7 @@ export class AudioService {
   public setSpatialMode(enabled: boolean): void {
     this.spatialMode = enabled;
     if (enabled) {
-      this.activeNotes.forEach((note, frequency) => {
+      this.noteManager?.forEach((note, frequency) => {
         if (!note.panner) {
           note.panner = this.createPannerNode();
           note.gainNode.disconnect();
@@ -275,7 +231,7 @@ export class AudioService {
         this.updateNotePosition(frequency, note.position);
       });
     } else {
-      this.activeNotes.forEach((note, frequency) => {
+      this.noteManager?.forEach((note, frequency) => {
         if (note.panner) {
           note.gainNode.disconnect();
           note.gainNode.connect(this.mainGainNode!);
@@ -289,7 +245,7 @@ export class AudioService {
   public moveListener(direction: 'forward' | 'backward' | 'left' | 'right' | 'up' | 'down'): void {
     if (!this.listener || !this.spatialMode) return;
 
-    const now = this.audioContext!.currentTime;
+    const now = this.context!.currentTime;
     const { x, y, z } = this.currentPosition;
     
     switch (direction) {
@@ -320,7 +276,7 @@ export class AudioService {
   public rotateListener(direction: 'left' | 'right'): void {
     if (!this.listener || !this.spatialMode) return;
 
-    const now = this.audioContext!.currentTime;
+    const now = this.context!.currentTime;
     const rotation = direction === 'left' ? -this.rotationSpeed : this.rotationSpeed;
     
     // Calculate new orientation based on current position
@@ -333,15 +289,15 @@ export class AudioService {
   }
 
   private updateNotePosition(frequency: number, position: SpatialPosition): void {
-    const note = this.activeNotes.get(frequency);
+    const note = this.noteManager?.get(frequency);
     if (!note || !note.panner) return;
 
-    const now = this.audioContext!.currentTime;
+    const now = this.context!.currentTime;
     note.panner.setPosition(position.x * 10, position.y * 10, position.z * 10);
   }
 
   private updateAllNotePositions(): void {
-    this.activeNotes.forEach((note, frequency) => {
+    this.noteManager?.forEach((note, frequency) => {
       this.updateNotePosition(frequency, note.position);
     });
   }
@@ -352,14 +308,14 @@ export class AudioService {
     isRhythmic: boolean = false,
     modulationParams?: ModulationParams
   ): NoteState {
-    if (!this.audioContext || !this.mainGainNode) {
+    if (!this.context || !this.mainGainNode) {
       throw new Error('Audio context not initialized');
     }
 
-    const now = this.audioContext.currentTime;
+    const now = this.context.currentTime;
 
     // Create main oscillator first
-    const oscillator = this.audioContext.createOscillator();
+    const oscillator = this.context.createOscillator();
     oscillator.type = waveform;
 
     // Apply sacred ratio modulation
@@ -368,7 +324,7 @@ export class AudioService {
     let sacredFrequency = frequency * sacredRatio;
 
     // Apply dark mode modifications
-    if (this.mode.isNightMode) {
+    if (this.darkModeProcessor?.mode.isNightMode) {
       // Use subharmonic ratios in dark mode
       const darkRatioKeys = Object.keys(SACRED_RATIOS).filter(k => k.startsWith('sub')) as SacredRatioKey[];
       const darkRatio = SACRED_RATIOS[darkRatioKeys[Math.floor(Math.random() * darkRatioKeys.length)]];
@@ -390,12 +346,12 @@ export class AudioService {
     const delayNetwork = this.createDelayNetwork(sacredFrequency);
 
     // Create gain node for amplitude envelope
-    const gainNode = this.audioContext.createGain();
+    const gainNode = this.context.createGain();
     gainNode.gain.setValueAtTime(0, now);
 
     // Create modulation oscillator with enhanced parameters
-    const modOscillator = this.audioContext.createOscillator();
-    const modGain = this.audioContext.createGain();
+    const modOscillator = this.context.createOscillator();
+    const modGain = this.context.createGain();
     
     // Adjust gain staging for better limiter interaction
     gainNode.gain.setValueAtTime(0, now);
@@ -419,7 +375,7 @@ export class AudioService {
           modGain.connect(gainNode);
           break;
         case 'phase':
-          const phaseNode = this.audioContext.createGain();
+          const phaseNode = this.context.createGain();
           phaseNode.gain.setValueAtTime(modulationParams.spinorPhase, now);
           modOscillator.connect(phaseNode);
           phaseNode.connect(oscillator.detune);
@@ -436,8 +392,8 @@ export class AudioService {
     // Create spinor oscillator if params provided
     let spinorOscillator, spinorGain;
     if (modulationParams?.spinorRate) {
-      spinorOscillator = this.audioContext.createOscillator();
-      spinorGain = this.audioContext.createGain();
+      spinorOscillator = this.context.createOscillator();
+      spinorGain = this.context.createGain();
       spinorOscillator.frequency.setValueAtTime(modulationParams.spinorRate, now);
       spinorGain.gain.setValueAtTime(modulationParams.depth * 0.5, now);
       spinorOscillator.connect(spinorGain);
@@ -448,8 +404,8 @@ export class AudioService {
     // Create rhythmic elements if needed
     let rhythmOscillator, rhythmGain;
     if (isRhythmic) {
-      rhythmOscillator = this.audioContext.createOscillator();
-      rhythmGain = this.audioContext.createGain();
+      rhythmOscillator = this.context.createOscillator();
+      rhythmGain = this.context.createGain();
       rhythmOscillator.type = 'square';
       rhythmOscillator.frequency.setValueAtTime(this.tempo / 60, now);
       rhythmGain.gain.setValueAtTime(0.2, now);
@@ -504,9 +460,9 @@ export class AudioService {
   }
 
   private applyADSR(note: NoteState, params?: ModulationParams): void {
-    if (!this.audioContext) return;
+    if (!this.context) return;
 
-    const now = this.audioContext.currentTime;
+    const now = this.context.currentTime;
     const { attack, decay, sustain } = this.adsr;
     const release = params?.releaseTime || this.adsr.release;
     const gateTime = params?.gateTime || (attack + decay);
@@ -544,8 +500,8 @@ export class AudioService {
     gateTime: number = 0,
     releaseTime: number = 0.3
   ): void {
-    if (!this.audioContext || !this.mainGainNode) {
-      this.logger.warn('AudioService', 'Audio context not initialized');
+    if (!this.noteManager) {
+      this.logger.warn('AudioService', 'Note manager not initialized');
       return;
     }
 
@@ -564,8 +520,13 @@ export class AudioService {
       };
 
       // Create and store new note
-      const note = this.createNote(frequency, waveform, isRhythmic, modulationParams);
-      this.activeNotes.set(frequency, note);
+      const note = this.noteManager.createNote(
+        frequency,
+        waveform,
+        isRhythmic,
+        modulationParams
+      );
+      this.noteManager.set(frequency, note);
       this.applyADSR(note, modulationParams);
 
       this.logger.info('AudioService', `Playing note at ${frequency}Hz with ${waveform} waveform and ${modulationType} modulation`);
@@ -575,114 +536,67 @@ export class AudioService {
   }
 
   public stopNote(frequency: number): void {
-    const note = this.activeNotes.get(frequency);
-    if (note && !note.isReleased) {
-      this.applyADSR(note, {
-        type: 'amplitude',
-        depth: 0,
-        rate: 0,
-        spinorRate: 0,
-        spinorPhase: 0,
-        gateTime: 0,
-        releaseTime: this.adsr.release
-      });
-      
-      // Clean up after release phase
-      setTimeout(() => {
-        if (this.activeNotes.has(frequency)) {
-          const noteToCleanup = this.activeNotes.get(frequency);
-          if (noteToCleanup) {
-            noteToCleanup.oscillator.stop();
-            noteToCleanup.modOscillator.stop();
-            noteToCleanup.rhythmOscillator?.stop();
-            noteToCleanup.spinorOscillator?.stop();
-            noteToCleanup.oscillator.disconnect();
-            noteToCleanup.gainNode.disconnect();
-            noteToCleanup.modOscillator.disconnect();
-            noteToCleanup.modGain.disconnect();
-            noteToCleanup.rhythmGain?.disconnect();
-            noteToCleanup.spinorGain?.disconnect();
-            this.activeNotes.delete(frequency);
-          }
-        }
-      }, this.adsr.release * 1000);
-    }
+    this.noteManager?.stopNote(frequency);
   }
 
   public stopAllNotes(): void {
-    this.activeNotes.forEach((note, frequency) => {
-      this.stopNote(frequency);
-    });
+    this.noteManager?.stopAllNotes();
   }
 
   public setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume));
-    if (this.mainGainNode && this.audioContext) {
-      this.mainGainNode.gain.setValueAtTime(this.volume, this.audioContext.currentTime);
+    if (this.mainGainNode && this.context) {
+      this.mainGainNode.gain.setValueAtTime(this.volume, this.context.currentTime);
     }
+    this.noteManager?.setVolume(volume);
   }
 
   public getAudioContext(): AudioContext | null {
-    return this.audioContext;
+    return this.context;
   }
 
   public getAnalyser(): AnalyserNode | null {
     return this.analyser;
   }
 
-  public cleanup(): void {
-    if (this.beatInterval) {
-      clearInterval(this.beatInterval);
+  public getPatternInput(): GainNode {
+    if (!this.patternProcessor) {
+      throw new Error('Pattern processor not initialized');
     }
-    this.stopAllNotes();
-    if (this.audioContext) {
-      this.audioContext.close();
-      this.audioContext = null;
+    return this.patternProcessor.getInput();
+  }
+
+  public setPatternFeedbackLevel(level: number): void {
+    this.patternProcessor?.setFeedbackLevel(level);
+  }
+
+  public setPatternMixLevel(level: number): void {
+    this.patternProcessor?.setMixLevel(level);
+  }
+
+  public getActiveNotes(): Map<number, NoteState> {
+    return this.noteManager?.getActiveNotes() || new Map();
+  }
+
+  public cleanup(): void {
+    this.patternProcessor?.cleanup();
+    this.darkModeProcessor?.cleanup();
+    this.noteManager?.cleanup();
+    
+    if (this.context) {
+      this.context.close();
+      this.context = null;
       this.analyser = null;
       this.mainGainNode = null;
       this.limiter = null;
+      this.patternProcessor = null;
+      this.spatialProcessor = null;
+      this.darkModeProcessor = null;
+      this.noteManager = null;
     }
-    this.delayNetworks.forEach(network => {
-      network.delay.disconnect();
-      network.feedback.disconnect();
-      network.filter.disconnect();
-      network.mix.disconnect();
-    });
-    this.delayNetworks.clear();
   }
 
   public setDarkMode(enabled: boolean): void {
-    if (!this.audioContext || !this.darkFilter) return;
-
-    this.mode.isNightMode = enabled;
-    const now = this.audioContext.currentTime;
-
-    if (enabled) {
-      // Dark mode audio settings
-      this.darkFilter.frequency.setValueAtTime(1000, now);
-      this.darkFilter.Q.setValueAtTime(2, now);
-      this.darkReverb!.connect(this.limiter!);
-      this.mode.filterCutoff = 1000;
-      this.mode.reverbAmount = 0.6;
-      this.mode.delayFeedback = 0.6;
-    } else {
-      // Light mode audio settings
-      this.darkFilter.frequency.setValueAtTime(2000, now);
-      this.darkFilter.Q.setValueAtTime(0.7, now);
-      this.darkReverb!.disconnect();
-      this.mode.filterCutoff = 2000;
-      this.mode.reverbAmount = 0.3;
-      this.mode.delayFeedback = 0.4;
-    }
-
-    // Update all active notes
-    this.activeNotes.forEach((note, frequency) => {
-      if (note.delayNetwork) {
-        note.delayNetwork.feedback.gain.setValueAtTime(
-          this.mode.delayFeedback,
-          now
-        );
-      }
-    });
+    this.darkModeProcessor?.setDarkMode(enabled);
   }
 } 

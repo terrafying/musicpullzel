@@ -14,18 +14,21 @@ export interface LogEntry {
 }
 
 export class Logger {
-  private static instance: Logger;
+  private static instances: Map<string, Logger> = new Map();
   private logs: LogEntry[] = [];
   private maxLogs: number = 1000;
   private subscribers: ((entry: LogEntry) => void)[] = [];
+  private context: string;
 
-  private constructor() {}
+  private constructor(context: string) {
+    this.context = context;
+  }
 
-  static getInstance(): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger();
+  public static create(context: string): Logger {
+    if (!Logger.instances.has(context)) {
+      Logger.instances.set(context, new Logger(context));
     }
-    return Logger.instance;
+    return Logger.instances.get(context)!;
   }
 
   private log(level: LogLevel, category: string, message: string, data?: any) {
@@ -72,20 +75,20 @@ export class Logger {
     }
   }
 
-  debug(category: string, message: string, data?: any) {
-    this.log(LogLevel.DEBUG, category, message, data);
-  }
-
-  info(category: string, message: string, data?: any) {
+  public info(category: string, message: string, data?: any) {
     this.log(LogLevel.INFO, category, message, data);
   }
 
-  warn(category: string, message: string, data?: any) {
+  public error(category: string, message: string, error?: any) {
+    this.log(LogLevel.ERROR, category, message, error);
+  }
+
+  public warn(category: string, message: string, data?: any) {
     this.log(LogLevel.WARN, category, message, data);
   }
 
-  error(category: string, message: string, data?: any) {
-    this.log(LogLevel.ERROR, category, message, data);
+  public debug(category: string, message: string, data?: any) {
+    this.log(LogLevel.DEBUG, category, message, data);
   }
 
   subscribe(callback: (entry: LogEntry) => void) {

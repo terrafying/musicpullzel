@@ -1,222 +1,135 @@
 import { AudioService } from './audio';
 import { EmergentPattern } from './types';
 
-interface RoutingConfig {
-  feedbackPath: number;
-  modulationPath: number;
-  evolutionPath: number;
+interface PatternSynthConfig {
+  frequency: number;
+  waveform: OscillatorType;
+  filterType: BiquadFilterType;
+  filterFreq: number;
+  filterQ: number;
+  modulationRate: number;
+  modulationDepth: number;
 }
 
 export class PatternSynthService {
   private audioService: AudioService;
-  private feedbackNodes: Map<number, GainNode> = new Map();
-  private controlLoops: Map<number, OscillatorNode> = new Map();
-  private patternFilters: Map<number, BiquadFilterNode> = new Map();
-  private feedbackDelay: DelayNode;
-  private feedbackGain: GainNode;
-  private patternMixer: GainNode;
+  private oscillators: Map<number, OscillatorNode> = new Map();
+  private filters: Map<number, BiquadFilterNode> = new Map();
+  private modulators: Map<number, OscillatorNode> = new Map();
   private context: AudioContext;
-  private routingNodes: Map<number, {
-    feedback: GainNode;
-    modulation: GainNode;
-    evolution: GainNode;
-  }> = new Map();
 
   constructor(audioService: AudioService) {
     this.audioService = audioService;
-    this.context = audioService.getAudioContext();
-    
-    // Create feedback delay
-    this.feedbackDelay = this.context.createDelay(2.0);
-    this.feedbackGain = this.context.createGain();
-    this.patternMixer = this.context.createGain();
-    
-    // Set up feedback loop
-    this.feedbackDelay.connect(this.feedbackGain);
-    this.feedbackGain.connect(this.feedbackDelay);
-    this.feedbackGain.gain.value = 0.3;
-    
-    // Connect to main output
-    this.feedbackDelay.connect(this.patternMixer);
-    this.patternMixer.connect(this.audioService.getMasterGain());
-  }
-
-  getAudioContext(): AudioContext {
-    return this.context;
+    const context = audioService.getAudioContext();
+    if (!context) {
+      throw new Error('AudioService not initialized');
+    }
+    this.context = context;
   }
 
   // Initialize pattern-based synthesis for a note
   initializePatternSynth(noteIndex: number, pattern: EmergentPattern) {
-    const { frequency, waveform } = this.getPatternParameters(pattern);
+    const config = this.getPatternConfig(pattern);
     
     // Create oscillator for the pattern
     const oscillator = this.context.createOscillator();
-    oscillator.type = waveform as OscillatorType;
-    oscillator.frequency.value = frequency;
+    oscillator.type = config.waveform;
+    oscillator.frequency.value = config.frequency;
     
     // Create pattern-specific filter
     const filter = this.context.createBiquadFilter();
-    this.configureFilter(filter, pattern);
-    this.patternFilters.set(noteIndex, filter);
+    filter.type = config.filterType;
+    filter.frequency.value = config.filterFreq;
+    filter.Q.value = config.filterQ;
     
-    // Create routing nodes
-    const routing = {
-      feedback: this.context.createGain(),
-      modulation: this.context.createGain(),
-      evolution: this.context.createGain()
-    };
-    this.routingNodes.set(noteIndex, routing);
+    // Create modulator
+    const modulator = this.context.createOscillator();
+    modulator.frequency.value = config.modulationRate;
     
-    // Create feedback node
-    const feedback = this.context.createGain();
-    feedback.gain.value = this.calculateFeedbackGain(pattern);
-    this.feedbackNodes.set(noteIndex, feedback);
+    // Create modulation gain
+    const modGain = this.context.createGain();
+    modGain.gain.value = config.modulationDepth;
     
-    // Create control loop oscillator
-    const controlLoop = this.context.createOscillator();
-    controlLoop.frequency.value = this.calculateControlFrequency(pattern);
-    this.controlLoops.set(noteIndex, controlLoop);
-    
-    // Connect the nodes with routing
+    // Connect the nodes
     oscillator.connect(filter);
-    filter.connect(routing.feedback);
-    routing.feedback.connect(feedback);
-    feedback.connect(this.feedbackDelay);
+    modulator.connect(modGain);
+    modGain.connect(oscillator.frequency);
     
-    // Set up modulation routing
-    controlLoop.connect(routing.modulation);
-    routing.modulation.connect(feedback.gain);
-    
-    // Set up evolution routing
-    const evolutionOsc = this.context.createOscillator();
-    evolutionOsc.frequency.value = 0.1;
-    evolutionOsc.connect(routing.evolution);
-    routing.evolution.connect(filter.frequency);
+    // Store references
+    this.oscillators.set(noteIndex, oscillator);
+    this.filters.set(noteIndex, filter);
+    this.modulators.set(noteIndex, modulator);
     
     // Start the oscillators
     oscillator.start();
-    controlLoop.start();
-    evolutionOsc.start();
+    modulator.start();
     
-    return { oscillator, filter, feedback, controlLoop, evolutionOsc };
-  }
-
-  // Update routing configuration
-  updateRouting(noteIndex: number, config: RoutingConfig) {
-    const routing = this.routingNodes.get(noteIndex);
-    if (!routing) return;
-
-    // Update routing gains
-    routing.feedback.gain.value = config.feedbackPath;
-    routing.modulation.gain.value = config.modulationPath;
-    routing.evolution.gain.value = config.evolutionPath;
-  }
-
-  // Evolve pattern based on evolution parameters
-  evolvePattern(noteIndex: number, evolution: { strength: number; type: string }) {
-    const filter = this.patternFilters.get(noteIndex);
-    const controlLoop = this.controlLoops.get(noteIndex);
+    // Connect to audio service's input
+    filter.connect(this.audioService.getPatternInput());
     
-    if (filter && controlLoop) {
-      // Update filter based on evolution
-      const currentFreq = filter.frequency.value;
-      const targetFreq = currentFreq * (1 + evolution.strength * 0.1);
-      filter.frequency.setTargetAtTime(targetFreq, this.context.currentTime, 0.1);
-      
-      // Update control loop based on evolution type
-      const baseFreq = this.calculateControlFrequency({ type: evolution.type, strength: evolution.strength } as EmergentPattern);
-      controlLoop.frequency.setTargetAtTime(baseFreq, this.context.currentTime, 0.1);
-    }
+    return { oscillator, filter, modulator };
   }
 
   // Update pattern synthesis based on pattern evolution
   updatePatternSynth(noteIndex: number, pattern: EmergentPattern) {
-    const filter = this.patternFilters.get(noteIndex);
-    const feedback = this.feedbackNodes.get(noteIndex);
-    const controlLoop = this.controlLoops.get(noteIndex);
+    const config = this.getPatternConfig(pattern);
+    const oscillator = this.oscillators.get(noteIndex);
+    const filter = this.filters.get(noteIndex);
+    const modulator = this.modulators.get(noteIndex);
     
-    if (filter && feedback && controlLoop) {
-      // Update filter parameters
-      this.configureFilter(filter, pattern);
-      
-      // Update feedback gain
-      feedback.gain.value = this.calculateFeedbackGain(pattern);
-      
-      // Update control loop frequency
-      controlLoop.frequency.value = this.calculateControlFrequency(pattern);
+    if (oscillator && filter && modulator) {
+      oscillator.frequency.setTargetAtTime(config.frequency, this.context.currentTime, 0.1);
+      filter.frequency.setTargetAtTime(config.filterFreq, this.context.currentTime, 0.1);
+      filter.Q.setTargetAtTime(config.filterQ, this.context.currentTime, 0.1);
+      modulator.frequency.setTargetAtTime(config.modulationRate, this.context.currentTime, 0.1);
     }
   }
 
   // Clean up pattern synthesis for a note
   cleanupPatternSynth(noteIndex: number) {
-    const filter = this.patternFilters.get(noteIndex);
-    const feedback = this.feedbackNodes.get(noteIndex);
-    const controlLoop = this.controlLoops.get(noteIndex);
+    const oscillator = this.oscillators.get(noteIndex);
+    const filter = this.filters.get(noteIndex);
+    const modulator = this.modulators.get(noteIndex);
     
-    if (filter && feedback && controlLoop) {
+    if (oscillator && filter && modulator) {
+      oscillator.stop();
+      modulator.stop();
       filter.disconnect();
-      feedback.disconnect();
-      controlLoop.stop();
       
-      this.patternFilters.delete(noteIndex);
-      this.feedbackNodes.delete(noteIndex);
-      this.controlLoops.delete(noteIndex);
+      this.oscillators.delete(noteIndex);
+      this.filters.delete(noteIndex);
+      this.modulators.delete(noteIndex);
     }
   }
 
   // Helper methods for parameter calculation
-  private getPatternParameters(pattern: EmergentPattern) {
+  private getPatternConfig(pattern: EmergentPattern): PatternSynthConfig {
     const baseFrequency = 440; // A4
     const frequency = baseFrequency * Math.pow(2, pattern.strength / 12);
-    const waveform = this.getPatternWaveform(pattern);
     
-    return { frequency, waveform };
+    return {
+      frequency,
+      waveform: this.getPatternWaveform(pattern),
+      filterType: 'bandpass',
+      filterFreq: 1000 + (pattern.strength * 500),
+      filterQ: 5 + (pattern.strength * 3),
+      modulationRate: 5 + (pattern.strength * 3),
+      modulationDepth: pattern.strength * 10
+    };
   }
 
   private getPatternWaveform(pattern: EmergentPattern): OscillatorType {
-    // Map pattern types to waveforms
-    switch (pattern.type) {
+    switch (pattern.patternType) {
       case 'harmonic':
         return 'sine';
       case 'rhythmic':
         return 'square';
-      case 'emergent':
+      case 'spatial':
         return 'sawtooth';
-      default:
+      case 'imaginary':
         return 'triangle';
+      default:
+        return 'sine';
     }
-  }
-
-  private configureFilter(filter: BiquadFilterNode, pattern: EmergentPattern) {
-    // Configure filter based on pattern characteristics
-    filter.type = 'bandpass';
-    filter.frequency.value = 1000 + (pattern.strength * 500);
-    filter.Q.value = 5 + (pattern.strength * 3);
-    filter.gain.value = pattern.strength * 10;
-  }
-
-  private calculateFeedbackGain(pattern: EmergentPattern): number {
-    // Calculate feedback gain based on pattern strength and type
-    const baseGain = 0.3;
-    const strengthFactor = pattern.strength * 0.5;
-    const typeFactor = pattern.type === 'emergent' ? 0.2 : 0.1;
-    
-    return Math.min(0.8, baseGain + strengthFactor + typeFactor);
-  }
-
-  private calculateControlFrequency(pattern: EmergentPattern): number {
-    // Calculate control loop frequency based on pattern characteristics
-    const baseFreq = 0.5; // Hz
-    return baseFreq * (1 + pattern.strength);
-  }
-
-  // Set overall feedback level
-  setFeedbackLevel(level: number) {
-    this.feedbackGain.gain.value = Math.max(0, Math.min(0.8, level));
-  }
-
-  // Set pattern mix level
-  setPatternMixLevel(level: number) {
-    this.patternMixer.gain.value = Math.max(0, Math.min(1, level));
   }
 } 
