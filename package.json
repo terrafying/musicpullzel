@@ -50,6 +50,7 @@
     ]
   },
   "dependencies": {
-    "face-api.js": "^0.22.2"
+    "face-api.js": "^0.22.2",
+    "jest": "29.7.0"
   }
 }
