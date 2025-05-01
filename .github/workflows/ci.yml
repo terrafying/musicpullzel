@@ -11,6 +11,7 @@ env:
   WASM_TARGET: "wasm32-unknown-unknown"
   CARGO_TERM_COLOR: "always"
   RUST_BACKTRACE: "1"
+  REPO_ROOT: "music-egg-dimension-priority-one"
 
 jobs:
   validate:
@@ -28,8 +29,8 @@ jobs:
       - name: Paranoid file validation
         run: |
           # Check for missing files with detailed error reporting
-          if [ ! -f "puzzle-core/Cargo.toml" ]; then
-            echo "Error: puzzle-core/Cargo.toml not found"
+          if [ ! -f "${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml" ]; then
+            echo "Error: ${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml not found"
             echo "Current directory contents:"
             ls -la
             echo "Parent directory contents:"
@@ -37,31 +38,31 @@ jobs:
             exit 1
           fi
           
-          if [ ! -f "puzzle-core/src/lib.rs" ]; then
-            echo "Error: puzzle-core/src/lib.rs not found"
+          if [ ! -f "${{ env.REPO_ROOT }}/puzzle-core/src/lib.rs" ]; then
+            echo "Error: ${{ env.REPO_ROOT }}/puzzle-core/src/lib.rs not found"
             echo "puzzle-core directory contents:"
-            ls -la puzzle-core
+            ls -la ${{ env.REPO_ROOT }}/puzzle-core
             echo "puzzle-core/src directory contents:"
-            ls -la puzzle-core/src
+            ls -la ${{ env.REPO_ROOT }}/puzzle-core/src
             exit 1
           fi
 
           # Verify file permissions
-          if [ ! -r "puzzle-core/Cargo.toml" ]; then
-            echo "Error: puzzle-core/Cargo.toml is not readable"
-            ls -l puzzle-core/Cargo.toml
+          if [ ! -r "${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml" ]; then
+            echo "Error: ${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml is not readable"
+            ls -l ${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml
             exit 1
           fi
 
           # Check for empty files
-          if [ ! -s "puzzle-core/Cargo.toml" ]; then
-            echo "Error: puzzle-core/Cargo.toml is empty"
+          if [ ! -s "${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml" ]; then
+            echo "Error: ${{ env.REPO_ROOT }}/puzzle-core/Cargo.toml is empty"
             exit 1
           fi
 
       - name: Paranoid wasm-bindgen validation
         run: |
-          cd puzzle-core
+          cd ${{ env.REPO_ROOT }}/puzzle-core
           
           # Verify Cargo.toml is valid
           if ! cargo check --verbose; then
@@ -143,7 +144,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            puzzle-core/target
+            ${{ env.REPO_ROOT }}/puzzle-core/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
@@ -151,7 +152,7 @@ jobs:
       - name: Get wasm-bindgen version
         id: wasm-bindgen
         run: |
-          cd puzzle-core
+          cd ${{ env.REPO_ROOT }}/puzzle-core
           VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
           if [ -z "$VERSION" ]; then
             echo "Could not determine wasm-bindgen version"
@@ -179,19 +180,19 @@ jobs:
 
       - name: Run cargo tests
         run: |
-          cd puzzle-core
+          cd ${{ env.REPO_ROOT }}/puzzle-core
           cargo test --verbose
           cargo test --verbose --no-default-features
           cargo test --verbose --all-features
 
       - name: Run clippy
         run: |
-          cd puzzle-core
+          cd ${{ env.REPO_ROOT }}/puzzle-core
           cargo clippy -- -D warnings
 
       - name: Build WASM
         run: |
-          cd puzzle-core
+          cd ${{ env.REPO_ROOT }}/puzzle-core
           wasm-pack build --target web --verbose
           
           # Verify build output
@@ -228,33 +229,33 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            puzzle-web/node_modules
-            puzzle-web/.bun
-          key: ${{ runner.os }}-bun-${{ hashFiles('puzzle-web/bun.lockb') }}
+            ${{ env.REPO_ROOT }}/puzzle-web/node_modules
+            ${{ env.REPO_ROOT }}/puzzle-web/.bun
+          key: ${{ runner.os }}-bun-${{ hashFiles('${{ env.REPO_ROOT }}/puzzle-web/bun.lockb') }}
           restore-keys: |
             ${{ runner.os }}-bun-
 
       - name: Validate web environment
         run: |
-          cd puzzle-web
+          cd ${{ env.REPO_ROOT }}/puzzle-web
           test -f package.json || (echo "Missing package.json" && exit 1)
           test -f tsconfig.json || (echo "Missing tsconfig.json" && exit 1)
           test -d src || (echo "Missing src directory" && exit 1)
 
       - name: Install dependencies
         run: |
-          cd puzzle-web
+          cd ${{ env.REPO_ROOT }}/puzzle-web
           bun install --frozen-lockfile
           bun pm ls
 
       - name: Type check
         run: |
-          cd puzzle-web
+          cd ${{ env.REPO_ROOT }}/puzzle-web
           bun run typecheck
 
       - name: Run tests
         run: |
-          cd puzzle-web
+          cd ${{ env.REPO_ROOT }}/puzzle-web
           bun test --coverage
           
           # Verify test coverage
@@ -265,7 +266,7 @@ jobs:
 
       - name: Build web app
         run: |
-          cd puzzle-web
+          cd ${{ env.REPO_ROOT }}/puzzle-web
           bun run build
           
           # Verify build output
@@ -283,6 +284,6 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: web-build
-          path: puzzle-web/dist/
+          path: ${{ env.REPO_ROOT }}/puzzle-web/dist/
           retention-days: 7
 
