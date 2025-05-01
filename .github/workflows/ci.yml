@@ -85,3 +85,119 @@ jobs:
           name: web-build
           path: puzzle-web/dist/
 
+  # Experimental jobs
+  nightly-rust:
+    name: Nightly Rust Build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Nightly Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          target: wasm32-unknown-unknown
+          override: true
+          
+      - name: Install dependencies
+        run: |
+          cargo install wasm-bindgen-cli --version 0.2.87
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          
+      - name: Build with nightly
+        run: |
+          cd puzzle-core
+          wasm-pack build --target web --out-dir ../puzzle-web/src/wasm-nightly
+          # Compare sizes
+          ls -lh ../puzzle-web/src/wasm/puzzle_core_bg.wasm
+          ls -lh ../puzzle-web/src/wasm-nightly/puzzle_core_bg.wasm
+
+  wasm-optimize:
+    name: WASM Optimization Test
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+          
+      - name: Install wasm-opt
+        run: |
+          wget https://github.com/WebAssembly/binaryen/releases/download/version_112/binaryen-version_112-x86_64-linux.tar.gz
+          tar xf binaryen-version_112-x86_64-linux.tar.gz
+          sudo mv binaryen-version_112/bin/* /usr/local/bin/
+          
+      - name: Build and optimize
+        run: |
+          cd puzzle-core
+          wasm-pack build --target web --out-dir ../puzzle-web/src/wasm-opt
+          wasm-opt -O4 ../puzzle-web/src/wasm-opt/puzzle_core_bg.wasm -o ../puzzle-web/src/wasm-opt/puzzle_core_bg.wasm
+          # Compare sizes
+          ls -lh ../puzzle-web/src/wasm/puzzle_core_bg.wasm
+          ls -lh ../puzzle-web/src/wasm-opt/puzzle_core_bg.wasm
+
+  wasm-bundler:
+    name: WASM Bundler Test
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: |
+          npm install -g webpack webpack-cli
+          npm install -g @wasm-tool/wasm-pack-plugin
+          
+      - name: Test different bundlers
+        run: |
+          cd puzzle-core
+          wasm-pack build --target bundler --out-dir ../puzzle-web/src/wasm-bundler
+          # Verify bundler output
+          test -f ../puzzle-web/src/wasm-bundler/puzzle_core_bg.wasm
+          test -f ../puzzle-web/src/wasm-bundler/puzzle_core.js
+
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+          
+      - name: Install dependencies
+        run: |
+          cargo install cargo-criterion
+          cargo install cargo-flamegraph
+          
+      - name: Run performance tests
+        run: |
+          cd puzzle-core
+          cargo criterion --message-format=json > criterion-report.json
+          # Generate flamegraph
+          cargo flamegraph --bench pattern_generation
+          
+      - name: Upload performance artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-data
+          path: |
+            puzzle-core/criterion-report.json
+            puzzle-core/flamegraph.svg
+
